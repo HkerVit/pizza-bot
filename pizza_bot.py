@@ -8,6 +8,7 @@ from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from environs import Env
 from email_validator import validate_email, EmailNotValidError
+from more_itertools import chunked
 
 from get_token import get_access_token
 from manage_moltin_shop import get_products_list, get_product_by_id
@@ -20,6 +21,8 @@ env.read_env()
 _database = None
 moltin_token = None
 moltin_token_expires = 0
+menu_page_number = 0
+
 
 def start(update, context):
     query = update.callback_query
@@ -31,7 +34,7 @@ def start(update, context):
     check_access_token()
     products = get_products_list(token=moltin_token)
     reply_markup = get_menu_keyboard(products)
-    context.bot.send_message(chat_id=chat_id, text='Please choose:',
+    context.bot.send_message(chat_id=chat_id, text='Please choose your pizza:',
                      reply_markup=reply_markup)
     if query:
         context.bot.delete_message(chat_id=chat_id, 
@@ -43,6 +46,7 @@ def start(update, context):
 def handle_menu(update, context):
     check_access_token()
     query = update.callback_query
+    print(query.data)
     chat_id = query.message.chat_id
 
     product_id = query.data
@@ -168,6 +172,7 @@ def handle_user(update, context):
 
 
 def handle_users_reply(update, context):
+    global menu_page_number
     query = update.callback_query
     db = get_database_connection()
 
@@ -188,6 +193,12 @@ def handle_users_reply(update, context):
         user_state = 'WAITING_EMAIL'
     elif user_reply == 'menu':
         user_state = 'START'
+    elif user_reply == 'next':
+        user_state = 'START'
+        menu_page_number += 1
+    elif user_reply == 'prev':
+        user_state = 'START'
+        menu_page_number -= 1
     else:
         user_state = db.get(chat_id).decode("utf-8")
 
@@ -206,6 +217,23 @@ def handle_users_reply(update, context):
         db.set(chat_id, next_state)
     except Exception as err:
         logging.exception(err)
+
+
+def get_menu_keyboard(products):
+    global menu_page_number
+    products_menu_page = list(chunked(products, 6))
+    if menu_page_number < 0:
+        menu_page_number = len(products_menu_page) - 1
+    if menu_page_number >= len(products_menu_page):
+        menu_page_number = 0
+
+    products_keyboard = [
+        [InlineKeyboardButton(product['name'], callback_data=product['id'])] for product in products_menu_page[menu_page_number]
+        ]
+    products_keyboard.append([InlineKeyboardButton('Prev page', callback_data='prev'),
+                              InlineKeyboardButton('Next page', callback_data='next')])
+    products_keyboard.append([InlineKeyboardButton('Cart', callback_data='cart')])
+    return InlineKeyboardMarkup(products_keyboard)
 
 
 def get_database_connection():
@@ -228,14 +256,6 @@ def check_access_token():
 
     if curent_time >= moltin_token_expires:
         moltin_token, moltin_token_expires = get_access_token()
-
-
-def get_menu_keyboard(products):
-    products_keyboard = [
-        [InlineKeyboardButton(product['name'], callback_data=product['id'])] for product in products
-        ]
-    products_keyboard.append([InlineKeyboardButton('Cart', callback_data='cart')])
-    return InlineKeyboardMarkup(products_keyboard)
 
 
 if __name__ == '__main__':
