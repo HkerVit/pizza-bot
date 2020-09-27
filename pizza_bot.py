@@ -1,6 +1,8 @@
 import logging
 from textwrap import dedent
 import time
+import sys
+import json
 
 import redis
 from telegram.ext import Filters, Updater
@@ -11,9 +13,10 @@ from email_validator import validate_email, EmailNotValidError
 from more_itertools import chunked
 
 from get_token import get_access_token
-from manage_moltin_shop import get_products_list, get_product_by_id
+from manage_moltin_shop import get_products_list
 from manage_moltin_shop import add_product_to_cart, remove_cart_items
 from manage_moltin_shop import get_cart_items, create_customer
+from manage_moltin_shop import get_image_url
 
 env = Env()
 env.read_env()
@@ -22,9 +25,11 @@ _database = None
 moltin_token = None
 moltin_token_expires = 0
 menu_page_number = 0
+products = []
 
 
 def start(update, context):
+    global products
     query = update.callback_query
     if query:
         chat_id = query.message.chat_id
@@ -32,7 +37,10 @@ def start(update, context):
         chat_id = update.message.chat_id
 
     check_access_token()
-    products = get_products_list(token=moltin_token)
+    if time.time() >= moltin_token_expires or len(products) == 0:
+        moltin_product_info = get_products_list(token=moltin_token)
+        fill_products_information(moltin_product_info)
+
     reply_markup = get_menu_keyboard(products)
     context.bot.send_message(chat_id=chat_id, text='Please choose your pizza:',
                      reply_markup=reply_markup)
@@ -46,16 +54,14 @@ def start(update, context):
 def handle_menu(update, context):
     check_access_token()
     query = update.callback_query
-    print(query.data)
     chat_id = query.message.chat_id
 
     product_id = query.data
-    product = get_product_by_id(token=moltin_token,
-                                product_id=product_id)
+    product, product_index = get_product_by_id(product_id=product_id)
+    image = get_image_url(token=moltin_token, image_id=product['image_id'])
 
-    measures = ['1', '2', '3']
     product_keyboard = [
-        [InlineKeyboardButton(f'{pieces} pcs', callback_data=f'{pieces},{product_id}') for pieces in measures],
+        [InlineKeyboardButton('Add to cart', callback_data=f'{product_index}')],
         [InlineKeyboardButton('Cart', callback_data='cart')],
         [InlineKeyboardButton('Menu', callback_data='menu')],
         [InlineKeyboardButton('Payment', callback_data='payment')]
@@ -65,13 +71,12 @@ def handle_menu(update, context):
     message = dedent(f'''
     {product['name']}
 
-    {product['price']} per pc
-    {product['stock']} on stock
+    {product['price']} rub
 
     {product['description']}
     ''')
-
-    context.bot.send_photo(chat_id=chat_id, photo=product['image_url'],
+    
+    context.bot.send_photo(chat_id=chat_id, photo=image,
                    caption=message, reply_markup=reply_markup)
     context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
 
@@ -83,13 +88,14 @@ def handle_description(update, context):
     query = update.callback_query
     chat_id = query.message.chat_id
 
-    quantity, product_id = query.data.split(',')
+    product_index = query.data
+    product = products[int(product_index)]
 
     add_product_to_cart(token=moltin_token,
-                        product_id=product_id,
-                        quantity=quantity,
+                        product_id=product['id'],
+                        quantity=1,
                         chat_id=chat_id)
-    message = f'Add {quantity} pcs'
+    message = f'Add {product["name"]} to cart'
     context.bot.answer_callback_query(callback_query_id=query.id, text=message)
 
     return 'HANDLE_DESCRIPTION'
@@ -117,17 +123,17 @@ def handle_cart(update, context):
             callback_data=f"remove,{product['id']}")])
 
         product_output = dedent(f'''
-            {product['name']}
+            Пицца {product['name']}
             {product['description']}
-            {product['price']} per kg
-            {product['quantity']} pcs in cart for {product['amount']}
+            {product['price']} rub
+            {product['quantity']} pizza in cart for {product['amount']} rub
             ''')
         message += product_output
 
     cart_keyboard.append([InlineKeyboardButton('Menu', callback_data='menu')])
     cart_keyboard.append([InlineKeyboardButton('Payment', callback_data='payment')])
     reply_markup = InlineKeyboardMarkup(cart_keyboard)
-    message += f'\nTotal: {total_amount}'
+    message += f'\nTotal: {total_amount} rub'
 
     context.bot.send_message(chat_id=chat_id, 
                      text=message, 
@@ -168,7 +174,7 @@ def handle_user(update, context):
     update.message.reply_text('Thank you for order. We will be contanting you soon',
                               reply_markup=reply_markup)
 
-    return 'HANDLE_MENU'
+    return 'START'
 
 
 def handle_users_reply(update, context):
@@ -234,6 +240,29 @@ def get_menu_keyboard(products):
                               InlineKeyboardButton('Next page', callback_data='next')])
     products_keyboard.append([InlineKeyboardButton('Cart', callback_data='cart')])
     return InlineKeyboardMarkup(products_keyboard)
+
+
+def fill_products_information(moltin_products_info):
+    global products
+    check_access_token()
+    for product in moltin_products_info:
+        products.append({
+                'name': product['name'],
+                'id': product['id'],
+                'description': product['description'],
+                'price': product['meta']['display_price']['with_tax']['formatted'],
+                'image_id': product['relationships']['main_image']['data']['id']
+            })
+
+
+def get_product_by_id(product_id):
+    global products
+    for count, product in enumerate(products):
+        if product_id == product['id']:
+            return product, count
+    
+    return None
+
 
 
 def get_database_connection():
