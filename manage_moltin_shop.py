@@ -135,9 +135,9 @@ def create_customer(token, username, email, password):
     response.raise_for_status()
 
 
-def get_customer(general_token, customer_id):
+def get_customer(token, customer_id):
     headers = {
-        'Authorization': general_token,
+        'Authorization': token,
     }
 
     url = f'https://api.moltin.com/v2/customers/{customer_id}'
@@ -146,3 +146,25 @@ def get_customer(general_token, customer_id):
     response.raise_for_status()
 
     return response.json()
+
+
+def get_all_entries(token):
+    headers = {
+        'Authorization': f'Bearer {token}',
+    }
+
+    url = 'https://api.moltin.com/v2/flows/pizzeria/entries'
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+
+    pizzerias = []
+    for pizzeria in response.json()['data']:
+        pizzerias.append({
+            'id': pizzeria['id'],
+            'address': pizzeria['address'],
+            'alias': pizzeria['alias'],
+            'lon': pizzeria['longitude'],
+            'lat': pizzeria['latitude']
+        })
+    
+    return pizzerias
