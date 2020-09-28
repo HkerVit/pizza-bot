@@ -1,8 +1,6 @@
 import logging
 from textwrap import dedent
 import time
-import sys
-import json
 
 import redis
 from telegram.ext import Filters, Updater
@@ -17,6 +15,7 @@ from manage_moltin_shop import get_products_list
 from manage_moltin_shop import add_product_to_cart, remove_cart_items
 from manage_moltin_shop import get_cart_items, create_customer
 from manage_moltin_shop import get_image_url
+from fetch_coordinates import fetch_coordinates
 
 env = Env()
 env.read_env()
@@ -42,7 +41,7 @@ def start(update, context):
         fill_products_information(moltin_product_info)
 
     reply_markup = get_menu_keyboard(products)
-    context.bot.send_message(chat_id=chat_id, text='Please choose your pizza:',
+    context.bot.send_message(chat_id=chat_id, text='Пожалуйста, выберите пиццу:',
                      reply_markup=reply_markup)
     if query:
         context.bot.delete_message(chat_id=chat_id, 
@@ -61,17 +60,17 @@ def handle_menu(update, context):
     image = get_image_url(token=moltin_token, image_id=product['image_id'])
 
     product_keyboard = [
-        [InlineKeyboardButton('Add to cart', callback_data=f'{product_index}')],
-        [InlineKeyboardButton('Cart', callback_data='cart')],
-        [InlineKeyboardButton('Menu', callback_data='menu')],
-        [InlineKeyboardButton('Payment', callback_data='payment')]
+        [InlineKeyboardButton('Положить в корзину', callback_data=f'{product_index}')],
+        [InlineKeyboardButton('Корзина', callback_data='cart')],
+        [InlineKeyboardButton('Меню', callback_data='menu')],
+        [InlineKeyboardButton('Оплата', callback_data='payment')]
         ]
     reply_markup = InlineKeyboardMarkup(product_keyboard)
 
     message = dedent(f'''
     {product['name']}
 
-    {product['price']} rub
+    {product['price']} руб
 
     {product['description']}
     ''')
@@ -87,15 +86,13 @@ def handle_description(update, context):
     check_access_token()
     query = update.callback_query
     chat_id = query.message.chat_id
-
-    product_index = query.data
-    product = products[int(product_index)]
+    product = products[int(query.data)]
 
     add_product_to_cart(token=moltin_token,
                         product_id=product['id'],
                         quantity=1,
                         chat_id=chat_id)
-    message = f'Add {product["name"]} to cart'
+    message = f'Добавлена {product["name"]} в корзину'
     context.bot.answer_callback_query(callback_query_id=query.id, text=message)
 
     return 'HANDLE_DESCRIPTION'
@@ -119,21 +116,22 @@ def handle_cart(update, context):
 
     for product in cart:
         cart_keyboard.append([InlineKeyboardButton(
-            f"Remove from cart {product['name']}", 
+            f"Убрать из корзины {product['name']}", 
             callback_data=f"remove,{product['id']}")])
 
         product_output = dedent(f'''
             Пицца {product['name']}
             {product['description']}
-            {product['price']} rub
-            {product['quantity']} pizza in cart for {product['amount']} rub
+            По цене {product['price']} руб
+
+            В заказе {product['quantity']} за {product['amount']} руб
             ''')
         message += product_output
 
-    cart_keyboard.append([InlineKeyboardButton('Menu', callback_data='menu')])
-    cart_keyboard.append([InlineKeyboardButton('Payment', callback_data='payment')])
+    cart_keyboard.append([InlineKeyboardButton('Меню', callback_data='menu')])
+    cart_keyboard.append([InlineKeyboardButton('Оплата', callback_data='payment')])
     reply_markup = InlineKeyboardMarkup(cart_keyboard)
-    message += f'\nTotal: {total_amount} rub'
+    message += f'\nВсего к оплате: {total_amount} руб'
 
     context.bot.send_message(chat_id=chat_id, 
                      text=message, 
@@ -144,12 +142,31 @@ def handle_cart(update, context):
     return 'HANDLE_CART'
 
 
-def waiting_email(update, context):
+def handle_waiting(update, context):
     query = update.callback_query
-    context.bot.send_message(chat_id=query.message.chat_id, 
-                     text='Please send your email')
+    if query:
+        chat_id = query.message.chat_id
+    else:
+        chat_id = update.message.chat_id
+    
+    if query:
+        context.bot.send_message(chat_id=chat_id, 
+                        text='Пожалуйста, напишите адрес текстом или пришлите локацию')
+    elif update.message.text:
+        try:
+            lon, lat = fetch_coordinates(update.message.text)
+            context.bot.send_message(chat_id=chat_id, 
+                            text=f'{lat},{lon}')
+        except IndexError:
+            context.bot.send_message(chat_id=chat_id, 
+                        text='К сожалению не удалось определить локацию. Попробуйте еще раз')
+    else:
+        lat = update.message.location.latitude
+        lon = update.message.location.longitude
+        context.bot.send_message(chat_id=chat_id, 
+                        text=f'{lat},{lon}')
 
-    return 'HANDLE_USER'
+    return 'HANDLE_WAITING'
 
 
 def handle_user(update, context):
@@ -164,14 +181,14 @@ def handle_user(update, context):
         update.message.reply_text('Sorry, but we cannot valid your email. Please try again')
         return 'HANDLE_USER'
 
-    keyboard = [[InlineKeyboardButton('Continue shopping', callback_data='start')]]
+    keyboard = [[InlineKeyboardButton('Еще один заказ пиццы', callback_data='start')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     create_customer(token=moltin_token, 
                     username=user_name,
                     email=email,
                     password=shop_password)
 
-    update.message.reply_text('Thank you for order. We will be contanting you soon',
+    update.message.reply_text('Спасибо за Ваш заказ. Мы свяжемся с Вами в течении 30 мин.',
                               reply_markup=reply_markup)
 
     return 'START'
@@ -196,7 +213,7 @@ def handle_users_reply(update, context):
     elif user_reply == 'cart':
         user_state = 'HANDLE_CART'
     elif user_reply == 'payment':
-        user_state = 'WAITING_EMAIL'
+        user_state = 'HANDLE_WAITING'
     elif user_reply == 'menu':
         user_state = 'START'
     elif user_reply == 'next':
@@ -213,7 +230,7 @@ def handle_users_reply(update, context):
         'HANDLE_MENU': handle_menu,
         'HANDLE_DESCRIPTION': handle_description,
         'HANDLE_CART': handle_cart,
-        'WAITING_EMAIL': waiting_email,
+        'HANDLE_WAITING': handle_waiting,
         'HANDLE_USER': handle_user,
     }
 
@@ -236,9 +253,9 @@ def get_menu_keyboard(products):
     products_keyboard = [
         [InlineKeyboardButton(product['name'], callback_data=product['id'])] for product in products_menu_page[menu_page_number]
         ]
-    products_keyboard.append([InlineKeyboardButton('Prev page', callback_data='prev'),
-                              InlineKeyboardButton('Next page', callback_data='next')])
-    products_keyboard.append([InlineKeyboardButton('Cart', callback_data='cart')])
+    products_keyboard.append([InlineKeyboardButton('<--', callback_data='prev'),
+                              InlineKeyboardButton('-->', callback_data='next')])
+    products_keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
     return InlineKeyboardMarkup(products_keyboard)
 
 
@@ -296,7 +313,8 @@ if __name__ == '__main__':
     dispatcher = updater.dispatcher
 
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
-    dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.location, handle_users_reply))
+    dispatcher.add_handler(MessageHandler(Filters.location, handle_users_reply))
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
 
     updater.start_polling()
