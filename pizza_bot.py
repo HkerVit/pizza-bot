@@ -1,13 +1,13 @@
 import logging
 from textwrap import dedent
 import time
+import json
 
 import redis
 from telegram.ext import Filters, Updater
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from environs import Env
-from email_validator import validate_email, EmailNotValidError
 from more_itertools import chunked
 
 from get_token import get_access_token
@@ -15,7 +15,9 @@ from manage_moltin_shop import get_products_list
 from manage_moltin_shop import add_product_to_cart, remove_cart_items
 from manage_moltin_shop import get_cart_items, create_customer
 from manage_moltin_shop import get_image_url
+from manage_moltin_shop import get_all_entries
 from fetch_coordinates import fetch_coordinates
+from distance import get_min_distance
 
 env = Env()
 env.read_env()
@@ -25,6 +27,7 @@ moltin_token = None
 moltin_token_expires = 0
 menu_page_number = 0
 products = []
+pizzerias = []
 
 
 def start(update, context):
@@ -143,55 +146,35 @@ def handle_cart(update, context):
 
 
 def handle_waiting(update, context):
+    global pizzerias
     query = update.callback_query
-    if query:
-        chat_id = query.message.chat_id
-    else:
-        chat_id = update.message.chat_id
-    
-    if query:
-        context.bot.send_message(chat_id=chat_id, 
-                        text='Пожалуйста, напишите адрес текстом или пришлите локацию')
-    elif update.message.text:
+    context.bot.send_message(chat_id=query.message.chat_id, 
+                text='Пожалуйста, напишите адрес текстом или пришлите локацию')
+    pizzerias = get_all_entries(moltin_token)
+
+    return 'HANDLE_LOCATION'
+
+
+def handle_location(update, context):
+    check_access_token()
+    chat_id = update.message.chat_id
+
+    if update.message.text:
         try:
             lon, lat = fetch_coordinates(update.message.text)
-            context.bot.send_message(chat_id=chat_id, 
-                            text=f'{lat},{lon}')
         except IndexError:
             context.bot.send_message(chat_id=chat_id, 
                         text='К сожалению не удалось определить локацию. Попробуйте еще раз')
+            return 'HANDLE_LOCATION'
+
     else:
         lat = update.message.location.latitude
         lon = update.message.location.longitude
-        context.bot.send_message(chat_id=chat_id, 
-                        text=f'{lat},{lon}')
+    
+    message = get_min_distance(lon, lat, pizzerias)
+    update.message.reply_text(message)
 
-    return 'HANDLE_WAITING'
-
-
-def handle_user(update, context):
-
-    user_name = f'{update.effective_user.first_name}_{update.effective_chat.id}'
-    shop_password = f'{update.effective_chat.id}'
-
-    try:
-        valid = validate_email(update.message.text)
-        email = valid.email
-    except EmailNotValidError:
-        update.message.reply_text('Sorry, but we cannot valid your email. Please try again')
-        return 'HANDLE_USER'
-
-    keyboard = [[InlineKeyboardButton('Еще один заказ пиццы', callback_data='start')]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    create_customer(token=moltin_token, 
-                    username=user_name,
-                    email=email,
-                    password=shop_password)
-
-    update.message.reply_text('Спасибо за Ваш заказ. Мы свяжемся с Вами в течении 30 мин.',
-                              reply_markup=reply_markup)
-
-    return 'START'
+    return 'HANDLE_LOCATION'
 
 
 def handle_users_reply(update, context):
@@ -231,7 +214,7 @@ def handle_users_reply(update, context):
         'HANDLE_DESCRIPTION': handle_description,
         'HANDLE_CART': handle_cart,
         'HANDLE_WAITING': handle_waiting,
-        'HANDLE_USER': handle_user,
+        'HANDLE_LOCATION': handle_location,
     }
 
     state_handler = states_functions[user_state]
