@@ -26,8 +26,6 @@ def create_flow(token):
     response = requests.post(url, headers=headers, data=json.dumps(data))
     response.raise_for_status()
 
-    print(response.json())
-
 
 def create_flow_fields(token):
     headers = {
@@ -62,8 +60,6 @@ def create_flow_fields(token):
     response = requests.post(url, headers=headers, data=json.dumps(data))
     response.raise_for_status()
 
-    print(response.json())
-
 
 def fill_customer_fields(client_id, lat, lon, token):
     headers = {
@@ -84,7 +80,6 @@ def fill_customer_fields(client_id, lat, lon, token):
 
     response = requests.post(url, headers=headers, data=json.dumps(data))
     response.raise_for_status()
-    print(response.json())
 
 
 def get_all_entries():
@@ -129,8 +124,6 @@ def update_entire(entire_id):
     url = f'https://api.moltin.com/v2/flows/pizzeria/entries/{entire_id}'
     response = requests.put(url, headers=headers, data=json.dumps(data))
     response.raise_for_status()
-
-    print(response.json())
 
 
 def check_access_token():
