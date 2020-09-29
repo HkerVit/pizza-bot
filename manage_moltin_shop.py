@@ -164,7 +164,8 @@ def get_all_entries(token):
             'address': pizzeria['address'],
             'alias': pizzeria['alias'],
             'lon': pizzeria['longitude'],
-            'lat': pizzeria['latitude']
+            'lat': pizzeria['latitude'],
+            'deliveryman': pizzeria['deliveryman']
         })
     
     return pizzerias
