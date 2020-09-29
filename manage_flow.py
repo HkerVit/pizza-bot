@@ -65,7 +65,7 @@ def create_flow_fields(token):
     print(response.json())
 
 
-def fill_fields(address, token):
+def fill_customer_fields(client_id, lat, lon, token):
     headers = {
         'Authorization': f'{token}',
         'Content-Type': 'application/json',
@@ -74,14 +74,13 @@ def fill_fields(address, token):
     data = { 
         "data": { 
             "type": "entry", 
-            "address": address['address']['full'],
-            "alias": address['alias'],
-            "longitude": address['coordinates']['lon'],
-            "latitude": address['coordinates']['lat'],
+            "client-id": client_id,
+            "longitude": lon,
+            "latitude": lat,
             } 
         }
 
-    url = 'https://api.moltin.com/v2/flows/pizzeria/entries'
+    url = 'https://api.moltin.com/v2/flows/customer-address/entries'
 
     response = requests.post(url, headers=headers, data=json.dumps(data))
     response.raise_for_status()
@@ -105,7 +104,8 @@ def get_all_entries():
             'address': pizzeria['address'],
             'alias': pizzeria['alias'],
             'lon': pizzeria['longitude'],
-            'lat': pizzeria['latitude']
+            'lat': pizzeria['latitude'],
+            'deliveryman': pizzeria['deliveryman']
         })
     
     return pizzerias
