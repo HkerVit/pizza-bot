@@ -16,6 +16,7 @@ from manage_moltin_shop import add_product_to_cart, remove_cart_items
 from manage_moltin_shop import get_cart_items, create_customer
 from manage_moltin_shop import get_image_url
 from manage_moltin_shop import get_all_entries
+from manage_flow import fill_customer_fields
 from fetch_coordinates import fetch_coordinates
 from distance import get_min_distance
 
@@ -27,8 +28,10 @@ moltin_token = None
 moltin_token_expires = 0
 menu_page_number = 0
 products = []
+cart = []
+total_amount = 0
 pizzerias = []
-
+pizzeria = {}
 
 def start(update, context):
     global products
@@ -102,6 +105,8 @@ def handle_description(update, context):
 
 
 def handle_cart(update, context):
+    global cart
+    global total_amount
     check_access_token()
     query = update.callback_query
     chat_id = query.message.chat_id
@@ -156,6 +161,7 @@ def handle_waiting(update, context):
 
 
 def handle_location(update, context):
+    global pizzeria
     check_access_token()
     chat_id = update.message.chat_id
 
@@ -171,10 +177,98 @@ def handle_location(update, context):
         lat = update.message.location.latitude
         lon = update.message.location.longitude
     
-    message = get_min_distance(lon, lat, pizzerias)
-    update.message.reply_text(message)
+    pizzeria = get_min_distance(lon, lat, pizzerias)
+    if pizzeria['distance'] > 20:
+        distance = int(pizzeria['distance'])
+        message = dedent(f'''
+        К сожалению Вы находитесь далеко от нас,
+        Ближайшая пиццерия аж в {distance} км от Вас!
+        ''')
+        keyboard = [
+            [InlineKeyboardButton('Завершить заказ', callback_data='close')],
+            [InlineKeyboardButton('Изменить заказ', callback_data='cart')]
+        ]
+    else:
+        keyboard = [
+            [InlineKeyboardButton('Самовывоз', callback_data='finish')],
+            [InlineKeyboardButton('Доставка', callback_data='delivery')]
+        ]
+        if pizzeria['distance'] <= 0.5:
+            distance = int(pizzeria['distance'] * 1000)
+            message = dedent(f'''
+            Может заберёте пиццу из нашей пиццерии неподалеку? 
+            Она всего в {distance} метров от Вас! Вот ее адрес: {pizzeria["address"]}. 
+            Но можем доставить и бесплатно! Нам не сложно)''')
 
-    return 'HANDLE_LOCATION'
+        elif pizzeria['distance'] <= 5:
+            message = dedent('''
+            Похоже придется ехать до Вас на самокате. 
+            Доставка будет стоить 100 руб. 
+            Доставляем или самовывоз?''')
+        else:
+            message = dedent(f'''
+            Вы довольно далеко от нас. Ближайшая к вам пиццерия
+            находится по адресу: {pizzeria["address"]}. Доставка будет стоить 300 руб.
+            Но Вы можете забрать пиццу самостоятельно)''')
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text(message, reply_markup=reply_markup)
+
+    return 'FINISH'
+
+
+def handle_delivery(update, context):
+    query = update.callback_query
+    chat_id = query.message.chat_id
+
+    fill_customer_fields(chat_id, pizzeria['client_lat'], pizzeria['client_lon'], moltin_token)
+
+    customer_message = dedent('''
+    Спасибо за выбор нашей пиццы!
+    Ваш заказ:
+    ''')
+    message = ''
+    for product in cart:
+        order = dedent(f'''
+            Пицца {product['name']}
+            {product['description']}
+            По цене {product['price']} руб - {product['quantity']} шт
+
+            ''')
+        message += order
+    customer_message = customer_message + message + f'Всего к оплате: {total_amount} руб'
+    query.edit_message_text(customer_message)
+
+    delivery_message = dedent(f'''
+    Получен заказ:
+    {message} Доставка вот по этому адресу
+    ''')
+    context.bot.send_message(chat_id=pizzeria['deliveryman'], text=delivery_message)
+    context.bot.send_location(chat_id=pizzeria['deliveryman'], 
+                              latitude=pizzeria['client_lat'], 
+                              longitude=pizzeria['client_lon'])
+
+    return 'HANDLE_DELIVERY'
+
+
+def finish(update, context):
+    query = update.callback_query
+
+    if query.data == 'close':
+        query.edit_message_text('Good bye')
+    elif query.data == 'finish':
+        chat_id = query.message.chat_id
+        lat = pizzeria['lat']
+        lon = pizzeria['lon']
+        message = dedent(f'''
+        Спасибо за то, что выбрали нас.
+        Ближайшая к вам пиццерия находится по адресу: 
+        {pizzeria['address']}
+        ''')
+        query.edit_message_text(message)
+        context.bot.send_location(chat_id=chat_id, latitude=lat, longitude=lon)
+    
+    return 'FINISH'
 
 
 def handle_users_reply(update, context):
@@ -205,6 +299,8 @@ def handle_users_reply(update, context):
     elif user_reply == 'prev':
         user_state = 'START'
         menu_page_number -= 1
+    elif user_reply == 'delivery':
+        user_state = 'HANDLE_DELIVERY'
     else:
         user_state = db.get(chat_id).decode("utf-8")
 
@@ -215,6 +311,8 @@ def handle_users_reply(update, context):
         'HANDLE_CART': handle_cart,
         'HANDLE_WAITING': handle_waiting,
         'HANDLE_LOCATION': handle_location,
+        'HANDLE_DELIVERY': handle_delivery,
+        'FINISH': finish,
     }
 
     state_handler = states_functions[user_state]
