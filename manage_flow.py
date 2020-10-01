@@ -2,7 +2,7 @@ import requests
 import json
 import time
 
-from get_token import get_access_token
+from moltin_token import get_access_token
 
 token = None
 token_time = 0

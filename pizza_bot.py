@@ -7,10 +7,11 @@ import redis
 from telegram.ext import Filters, Updater
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import LabeledPrice
 from environs import Env
 from more_itertools import chunked
 
-from get_token import get_access_token
+from moltin_token import get_access_token
 from manage_moltin_shop import get_products_list
 from manage_moltin_shop import add_product_to_cart, remove_cart_items
 from manage_moltin_shop import get_cart_items, create_customer
@@ -18,10 +19,13 @@ from manage_moltin_shop import get_image_url
 from manage_moltin_shop import get_all_entries
 from manage_flow import fill_customer_fields
 from fetch_coordinates import fetch_coordinates
-from distance import get_min_distance
+from closest_pizzeria import get_closest_pizzeria
 
 env = Env()
 env.read_env()
+
+PAYLOAD = env('PAYLOAD')
+PAYMENT_TOKEN = env('PAYMENT_TOKEN')
 
 _database = None
 moltin_token = None
@@ -177,7 +181,7 @@ def handle_location(update, context):
         lat = update.message.location.latitude
         lon = update.message.location.longitude
     
-    pizzeria = get_min_distance(lon, lat, pizzerias)
+    pizzeria = get_closest_pizzeria(lon, lat, pizzerias)
     if pizzeria['distance'] > 20:
         distance = int(pizzeria['distance'])
         message = dedent(f'''
@@ -237,7 +241,12 @@ def handle_delivery(update, context):
             ''')
         message += order
     customer_message = customer_message + message + f'Всего к оплате: {total_amount} руб'
-    query.edit_message_text(customer_message)
+    keyboard = [
+        [InlineKeyboardButton('Оплата наличными', callback_data='cash')],
+        [InlineKeyboardButton('Оплата картой', callback_data='card')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.edit_message_text(customer_message, reply_markup=reply_markup)
 
     delivery_message = dedent(f'''
     Получен заказ:
@@ -247,8 +256,50 @@ def handle_delivery(update, context):
     context.bot.send_location(chat_id=pizzeria['deliveryman'], 
                               latitude=pizzeria['client_lat'], 
                               longitude=pizzeria['client_lon'])
+    
+    return 'HANDLE_PAYMENT'
 
-    return 'HANDLE_DELIVERY'
+
+def handle_payment(update, context):
+    query = update.callback_query 
+    chat_id = query.message.chat_id
+
+    title = "Оплата заказа"
+    description = "Оплата заказа пиццы"
+    payload = PAYLOAD
+    provider_token = PAYMENT_TOKEN
+    start_parameter = "test-payment"
+    currency = "RUB"
+    price = int(total_amount)
+    prices = [LabeledPrice("Test", price * 100)]
+    context.bot.send_invoice(chat_id, title, description, payload,
+                             provider_token, start_parameter, currency, prices)
+    
+    context.job_queue.run_once(delivery_notification, 15, context=chat_id)
+
+    return 'HANDLE_PAYMENT'
+
+def precheckout_callback(update, context):
+    query = update.pre_checkout_query
+    # check the payload, is this from your bot?
+    if query.invoice_payload != payload:
+        query.answer(ok=False, error_message="Something went wrong...")
+    else:
+        query.answer(ok=True)
+
+
+def successful_payment_callback(update, context):
+    update.message.reply_text("Thank you for your payment!")
+
+
+def delivery_notification(context):
+    message = dedent(f'''
+    Приятного аппетита! *место для рекламы*
+
+    *сообщение что делать если пицца не пришла*
+    ''')
+    job = context.job
+    context.bot.send_message(job.context, text=message)
 
 
 def finish(update, context):
@@ -267,6 +318,8 @@ def finish(update, context):
         ''')
         query.edit_message_text(message)
         context.bot.send_location(chat_id=chat_id, latitude=lat, longitude=lon)
+    else:
+        chat_id = update.message.chat_id
     
     return 'FINISH'
 
@@ -312,6 +365,7 @@ def handle_users_reply(update, context):
         'HANDLE_WAITING': handle_waiting,
         'HANDLE_LOCATION': handle_location,
         'HANDLE_DELIVERY': handle_delivery,
+        'HANDLE_PAYMENT': handle_payment,
         'FINISH': finish,
     }
 
@@ -393,7 +447,7 @@ if __name__ == '__main__':
     updater = Updater(token, use_context=True)
     dispatcher = updater.dispatcher
 
-    dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
+    dispatcher.add_handler(CallbackQueryHandler(handle_users_reply, pass_job_queue=True))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.location, handle_users_reply))
     dispatcher.add_handler(MessageHandler(Filters.location, handle_users_reply))
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
