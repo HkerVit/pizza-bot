@@ -6,26 +6,24 @@ import json
 import redis
 from telegram.ext import Filters, Updater
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
+from telegram.ext import (Filters, PreCheckoutQueryHandler)
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram import LabeledPrice
 from environs import Env
-from more_itertools import chunked
 
 from moltin_token import get_access_token
-from manage_moltin_shop import get_products_list
-from manage_moltin_shop import add_product_to_cart, remove_cart_items
-from manage_moltin_shop import get_cart_items, create_customer
-from manage_moltin_shop import get_image_url
-from manage_moltin_shop import get_all_entries
-from manage_flow import fill_customer_fields
+from moltin_bot_function import get_products_list
+from moltin_bot_function import add_product_to_cart, remove_cart_items
+from moltin_bot_function import get_cart_items, create_customer
+from moltin_bot_function import get_image_url
+from moltin_bot_function import get_all_entries
+from moltin_flow import fill_customer_fields
 from fetch_coordinates import fetch_coordinates
 from closest_pizzeria import get_closest_pizzeria
+from keyboard import get_menu_keyboard
+import payment
 
 env = Env()
 env.read_env()
-
-PAYLOAD = env('PAYLOAD')
-PAYMENT_TOKEN = env('PAYMENT_TOKEN')
 
 _database = None
 moltin_token = None
@@ -50,7 +48,7 @@ def start(update, context):
         moltin_product_info = get_products_list(token=moltin_token)
         fill_products_information(moltin_product_info)
 
-    reply_markup = get_menu_keyboard(products)
+    reply_markup = get_menu_keyboard(products, menu_page_number)
     context.bot.send_message(chat_id=chat_id, text='Пожалуйста, выберите пиццу:',
                      reply_markup=reply_markup)
     if query:
@@ -70,10 +68,8 @@ def handle_menu(update, context):
     image = get_image_url(token=moltin_token, image_id=product['image_id'])
 
     product_keyboard = [
-        [InlineKeyboardButton('Положить в корзину', callback_data=f'{product_index}')],
-        [InlineKeyboardButton('Корзина', callback_data='cart')],
+        [InlineKeyboardButton(f'Выбрать {product["name"]}', callback_data=f'{product_index}')],
         [InlineKeyboardButton('Меню', callback_data='menu')],
-        [InlineKeyboardButton('Оплата', callback_data='payment')]
         ]
     reply_markup = InlineKeyboardMarkup(product_keyboard)
 
@@ -141,13 +137,14 @@ def handle_cart(update, context):
         message += product_output
 
     cart_keyboard.append([InlineKeyboardButton('Меню', callback_data='menu')])
-    cart_keyboard.append([InlineKeyboardButton('Оплата', callback_data='payment')])
+    cart_keyboard.append([InlineKeyboardButton('Выбор доставки', callback_data='delivery_choice')])
     reply_markup = InlineKeyboardMarkup(cart_keyboard)
     message += f'\nВсего к оплате: {total_amount} руб'
 
     context.bot.send_message(chat_id=chat_id, 
                      text=message, 
                      reply_markup=reply_markup)
+
     context.bot.delete_message(chat_id=query.message.chat_id, 
                        message_id=query.message.message_id)
 
@@ -256,41 +253,18 @@ def handle_delivery(update, context):
     context.bot.send_location(chat_id=pizzeria['deliveryman'], 
                               latitude=pizzeria['client_lat'], 
                               longitude=pizzeria['client_lon'])
-    
+       
     return 'HANDLE_PAYMENT'
 
 
 def handle_payment(update, context):
     query = update.callback_query 
     chat_id = query.message.chat_id
+    amount = int(total_amount)
+    payment.start_without_shipping_callback(update, context, amount) 
 
-    title = "Оплата заказа"
-    description = "Оплата заказа пиццы"
-    payload = PAYLOAD
-    provider_token = PAYMENT_TOKEN
-    start_parameter = "test-payment"
-    currency = "RUB"
-    price = int(total_amount)
-    prices = [LabeledPrice("Test", price * 100)]
-    context.bot.send_invoice(chat_id, title, description, payload,
-                             provider_token, start_parameter, currency, prices)
+    return 'FINISH'
     
-    context.job_queue.run_once(delivery_notification, 15, context=chat_id)
-
-    return 'HANDLE_PAYMENT'
-
-def precheckout_callback(update, context):
-    query = update.pre_checkout_query
-    # check the payload, is this from your bot?
-    if query.invoice_payload != payload:
-        query.answer(ok=False, error_message="Something went wrong...")
-    else:
-        query.answer(ok=True)
-
-
-def successful_payment_callback(update, context):
-    update.message.reply_text("Thank you for your payment!")
-
 
 def delivery_notification(context):
     message = dedent(f'''
@@ -305,22 +279,23 @@ def delivery_notification(context):
 def finish(update, context):
     query = update.callback_query
 
-    if query.data == 'close':
-        query.edit_message_text('Good bye')
-    elif query.data == 'finish':
-        chat_id = query.message.chat_id
-        lat = pizzeria['lat']
-        lon = pizzeria['lon']
-        message = dedent(f'''
-        Спасибо за то, что выбрали нас.
-        Ближайшая к вам пиццерия находится по адресу: 
-        {pizzeria['address']}
-        ''')
-        query.edit_message_text(message)
-        context.bot.send_location(chat_id=chat_id, latitude=lat, longitude=lon)
-    else:
-        chat_id = update.message.chat_id
-    
+    if query:
+        if query.data == 'close':
+            query.edit_message_text('Good bye')
+        else:
+            chat_id = query.message.chat_id
+            lat = pizzeria['lat']
+            lon = pizzeria['lon']
+            message = dedent(f'''
+            Спасибо за то, что выбрали нас.
+            Ближайшая к вам пиццерия находится по адресу: 
+            {pizzeria['address']}
+            ''')
+            query.edit_message_text(message)
+            context.bot.send_location(chat_id=chat_id, latitude=lat, longitude=lon)
+
+    update.message.reply_text(text='Спасибо за покупку нашей пиццы!')
+    context.job_queue.run_once(delivery_notification, 15, context=update.message.chat_id)
     return 'FINISH'
 
 
@@ -342,7 +317,7 @@ def handle_users_reply(update, context):
         user_state = 'START'
     elif user_reply == 'cart':
         user_state = 'HANDLE_CART'
-    elif user_reply == 'payment':
+    elif user_reply == 'delivery_choice':
         user_state = 'HANDLE_WAITING'
     elif user_reply == 'menu':
         user_state = 'START'
@@ -375,23 +350,6 @@ def handle_users_reply(update, context):
         db.set(chat_id, next_state)
     except Exception as err:
         logging.exception(err)
-
-
-def get_menu_keyboard(products):
-    global menu_page_number
-    products_menu_page = list(chunked(products, 6))
-    if menu_page_number < 0:
-        menu_page_number = len(products_menu_page) - 1
-    if menu_page_number >= len(products_menu_page):
-        menu_page_number = 0
-
-    products_keyboard = [
-        [InlineKeyboardButton(product['name'], callback_data=product['id'])] for product in products_menu_page[menu_page_number]
-        ]
-    products_keyboard.append([InlineKeyboardButton('<--', callback_data='prev'),
-                              InlineKeyboardButton('-->', callback_data='next')])
-    products_keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
-    return InlineKeyboardMarkup(products_keyboard)
 
 
 def fill_products_information(moltin_products_info):
@@ -450,6 +408,8 @@ if __name__ == '__main__':
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply, pass_job_queue=True))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.location, handle_users_reply))
     dispatcher.add_handler(MessageHandler(Filters.location, handle_users_reply))
+    dispatcher.add_handler(PreCheckoutQueryHandler(payment.precheckout_callback))
+    dispatcher.add_handler(MessageHandler(Filters.successful_payment, finish))
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
 
     updater.start_polling()
