@@ -19,7 +19,7 @@ from moltin_bot_function import get_all_entries
 from moltin_flow import fill_customer_fields
 from fetch_coordinates import fetch_coordinates
 from closest_pizzeria import get_closest_pizzeria
-from keyboard import get_menu_keyboard
+import keyboard
 import payment
 
 env = Env()
@@ -36,7 +36,6 @@ pizzerias = []
 pizzeria = {}
 
 def start(update, context):
-    global products
     query = update.callback_query
     if query:
         chat_id = query.message.chat_id
@@ -46,9 +45,9 @@ def start(update, context):
     check_access_token()
     if time.time() >= moltin_token_expires or len(products) == 0:
         moltin_product_info = get_products_list(token=moltin_token)
-        fill_products_information(moltin_product_info)
+        get_all_products(moltin_product_info)
 
-    reply_markup = get_menu_keyboard(products, menu_page_number)
+    reply_markup = keyboard.get_menu_keyboard(products, menu_page_number)
     context.bot.send_message(chat_id=chat_id, text='Пожалуйста, выберите пиццу:',
                      reply_markup=reply_markup)
     if query:
@@ -64,23 +63,10 @@ def handle_menu(update, context):
     chat_id = query.message.chat_id
 
     product_id = query.data
-    product, product_index = get_product_by_id(product_id=product_id)
-    image = get_image_url(token=moltin_token, image_id=product['image_id'])
+    product = next((product for product in products if product['id'] == product_id))
 
-    product_keyboard = [
-        [InlineKeyboardButton(f'Выбрать {product["name"]}', callback_data=f'{product_index}')],
-        [InlineKeyboardButton('Меню', callback_data='menu')],
-        ]
-    reply_markup = InlineKeyboardMarkup(product_keyboard)
+    reply_markup, message, image = keyboard.get_product_keyboard_and_text(products, product_id, moltin_token)
 
-    message = dedent(f'''
-    {product['name']}
-
-    {product['price']} руб
-
-    {product['description']}
-    ''')
-    
     context.bot.send_photo(chat_id=chat_id, photo=image,
                    caption=message, reply_markup=reply_markup)
     context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
@@ -92,8 +78,9 @@ def handle_description(update, context):
     check_access_token()
     query = update.callback_query
     chat_id = query.message.chat_id
-    product = products[int(query.data)]
+    product_id = query.data
 
+    product = next((product for product in products if product['id'] == product_id))
     add_product_to_cart(token=moltin_token,
                         product_id=product['id'],
                         quantity=1,
@@ -116,30 +103,8 @@ def handle_cart(update, context):
         remove_cart_items(token=moltin_token, 
                           product_id=product_id, 
                           chat_id=chat_id)
-
-    message = ''
-    cart_keyboard = []
-    cart, total_amount = get_cart_items(token=moltin_token, 
-                                        chat_id=chat_id)
-
-    for product in cart:
-        cart_keyboard.append([InlineKeyboardButton(
-            f"Убрать из корзины {product['name']}", 
-            callback_data=f"remove,{product['id']}")])
-
-        product_output = dedent(f'''
-            Пицца {product['name']}
-            {product['description']}
-            По цене {product['price']} руб
-
-            В заказе {product['quantity']} за {product['amount']} руб
-            ''')
-        message += product_output
-
-    cart_keyboard.append([InlineKeyboardButton('Меню', callback_data='menu')])
-    cart_keyboard.append([InlineKeyboardButton('Выбор доставки', callback_data='delivery_choice')])
-    reply_markup = InlineKeyboardMarkup(cart_keyboard)
-    message += f'\nВсего к оплате: {total_amount} руб'
+    
+    reply_markup, message, cart, total_amount = keyboard.get_cart_keyboard_and_text(moltin_token, chat_id)
 
     context.bot.send_message(chat_id=chat_id, 
                      text=message, 
@@ -352,9 +317,8 @@ def handle_users_reply(update, context):
         logging.exception(err)
 
 
-def fill_products_information(moltin_products_info):
+def get_all_products(moltin_products_info):
     global products
-    check_access_token()
     for product in moltin_products_info:
         products.append({
                 'name': product['name'],
