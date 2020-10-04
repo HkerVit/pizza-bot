@@ -86,12 +86,9 @@ def get_cart_items(token, chat_id):
 
     response = requests.get(url, headers=headers)
     response.raise_for_status()
-
     cart = response.json()
+
     items =[]
-
-    total_amount = cart['meta']['display_price']['with_tax']['formatted']
-
     for item in cart['data']:
         items.append({
             'name': item['name'],
@@ -102,7 +99,9 @@ def get_cart_items(token, chat_id):
             'amount': item['meta']['display_price']['with_tax']['value']['formatted'],
         })
 
-    return items, total_amount
+    total_amount = cart['meta']['display_price']['with_tax']['amount']
+
+    return {'items': items, 'total_amount': total_amount}
 
 
 def remove_cart_items(token, chat_id, product_id):
@@ -169,3 +168,24 @@ def get_all_entries(token):
         })
     
     return pizzerias
+
+
+def fill_customer_fields(client_id, lat, lon, token):
+    headers = {
+        'Authorization': f'{token}',
+        'Content-Type': 'application/json',
+    }
+
+    data = { 
+        "data": { 
+            "type": "entry", 
+            "client-id": client_id,
+            "longitude": lon,
+            "latitude": lat,
+            } 
+        }
+
+    url = 'https://api.moltin.com/v2/flows/customer-address/entries'
+
+    response = requests.post(url, headers=headers, data=json.dumps(data))
+    response.raise_for_status()
