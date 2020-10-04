@@ -32,7 +32,6 @@ menu_page_number = 0
 products = []
 cart = []
 total_amount = 0
-pizzerias = []
 pizzeria = {}
 
 def start(update, context):
@@ -117,11 +116,9 @@ def handle_cart(update, context):
 
 
 def handle_waiting(update, context):
-    global pizzerias
     query = update.callback_query
     context.bot.send_message(chat_id=query.message.chat_id, 
                 text='Пожалуйста, напишите адрес текстом или пришлите локацию')
-    pizzerias = get_all_entries(moltin_token)
 
     return 'HANDLE_LOCATION'
 
@@ -142,42 +139,8 @@ def handle_location(update, context):
     else:
         lat = update.message.location.latitude
         lon = update.message.location.longitude
-    
-    pizzeria = get_closest_pizzeria(lon, lat, pizzerias)
-    if pizzeria['distance'] > 20:
-        distance = int(pizzeria['distance'])
-        message = dedent(f'''
-        К сожалению Вы находитесь далеко от нас,
-        Ближайшая пиццерия аж в {distance} км от Вас!
-        ''')
-        keyboard = [
-            [InlineKeyboardButton('Завершить заказ', callback_data='close')],
-            [InlineKeyboardButton('Изменить заказ', callback_data='cart')]
-        ]
-    else:
-        keyboard = [
-            [InlineKeyboardButton('Самовывоз', callback_data='finish')],
-            [InlineKeyboardButton('Доставка', callback_data='delivery')]
-        ]
-        if pizzeria['distance'] <= 0.5:
-            distance = int(pizzeria['distance'] * 1000)
-            message = dedent(f'''
-            Может заберёте пиццу из нашей пиццерии неподалеку? 
-            Она всего в {distance} метров от Вас! Вот ее адрес: {pizzeria["address"]}. 
-            Но можем доставить и бесплатно! Нам не сложно)''')
 
-        elif pizzeria['distance'] <= 5:
-            message = dedent('''
-            Похоже придется ехать до Вас на самокате. 
-            Доставка будет стоить 100 руб. 
-            Доставляем или самовывоз?''')
-        else:
-            message = dedent(f'''
-            Вы довольно далеко от нас. Ближайшая к вам пиццерия
-            находится по адресу: {pizzeria["address"]}. Доставка будет стоить 300 руб.
-            Но Вы можете забрать пиццу самостоятельно)''')
-    
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup, message, pizzeria = keyboard.get_location_keyboard_and_text(moltin_token, lon, lat)
     update.message.reply_text(message, reply_markup=reply_markup)
 
     return 'FINISH'
