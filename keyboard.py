@@ -4,6 +4,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from more_itertools import chunked
 
 import moltin_bot_function
+import closest_pizzeria
 
 
 
@@ -44,9 +45,9 @@ def get_product_keyboard_and_text(products, product_id, token):
 def get_cart_keyboard_and_text(token, chat_id):
     cart, total_amount = moltin_bot_function.get_cart_items(token, chat_id)
     message = ''
-    cart_keyboard = []
+    keyboard = []
     for product in cart:
-        cart_keyboard.append([InlineKeyboardButton(f"Убрать из корзины {product['name']}", callback_data=f"remove,{product['id']}")])
+        keyboard.append([InlineKeyboardButton(f"Убрать из корзины {product['name']}", callback_data=f"remove,{product['id']}")])
 
         product_output = dedent(f'''
             Пицца {product['name']}
@@ -57,9 +58,51 @@ def get_cart_keyboard_and_text(token, chat_id):
             ''')
         message += product_output
 
-    cart_keyboard.append([InlineKeyboardButton('Меню', callback_data='menu')])
-    cart_keyboard.append([InlineKeyboardButton('Выбор доставки', callback_data='delivery_choice')])
-    reply_markup = InlineKeyboardMarkup(cart_keyboard)
+    keyboard.append([InlineKeyboardButton('Меню', callback_data='menu')])
+    keyboard.append([InlineKeyboardButton('Выбор доставки', callback_data='delivery_choice')])
+    reply_markup = InlineKeyboardMarkup(keyboard)
     message += f'\nВсего к оплате: {total_amount} руб'
 
     return reply_markup, message, cart, total_amount
+
+
+def get_location_keyboard_and_text(token, lon, lat):
+    pizzerias = moltin_bot_function.get_all_entries(token)    
+    pizzeria = closest_pizzeria.get_closest_pizzeria(lon, lat, pizzerias)
+
+    if pizzeria['distance'] > 20:
+        distance = int(pizzeria['distance'])
+        message = dedent(f'''
+        К сожалению Вы находитесь далеко от нас,
+        Ближайшая пиццерия аж в {distance} км от Вас!
+        ''')
+        keyboard = [
+            [InlineKeyboardButton('Завершить заказ', callback_data='close')],
+            [InlineKeyboardButton('Изменить заказ', callback_data='cart')]
+        ]
+    else:
+        keyboard = [
+            [InlineKeyboardButton('Самовывоз', callback_data='finish')],
+            [InlineKeyboardButton('Доставка', callback_data='delivery')]
+        ]
+        if pizzeria['distance'] <= 0.5:
+            distance = int(pizzeria['distance'] * 1000)
+            message = dedent(f'''
+            Может заберёте пиццу из нашей пиццерии неподалеку? 
+            Она всего в {distance} метров от Вас! Вот ее адрес: {pizzeria["address"]}. 
+            Но можем доставить и бесплатно! Нам не сложно)''')
+
+        elif pizzeria['distance'] <= 5:
+            message = dedent('''
+            Похоже придется ехать до Вас на самокате. 
+            Доставка будет стоить 100 руб. 
+            Доставляем или самовывоз?''')
+        else:
+            message = dedent(f'''
+            Вы довольно далеко от нас. Ближайшая к вам пиццерия
+            находится по адресу: {pizzeria["address"]}. Доставка будет стоить 300 руб.
+            Но Вы можете забрать пиццу самостоятельно)''')
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    return reply_markup, message, pizzeria
