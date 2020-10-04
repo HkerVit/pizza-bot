@@ -43,10 +43,10 @@ def get_product_keyboard_and_text(products, product_id, token):
 
 
 def get_cart_keyboard_and_text(token, chat_id):
-    cart, total_amount = moltin_bot_function.get_cart_items(token, chat_id)
+    cart = moltin_bot_function.get_cart_items(token, chat_id)
     message = ''
     keyboard = []
-    for product in cart:
+    for product in cart['items']:
         keyboard.append([InlineKeyboardButton(f"Убрать из корзины {product['name']}", callback_data=f"remove,{product['id']}")])
 
         product_output = dedent(f'''
@@ -61,9 +61,9 @@ def get_cart_keyboard_and_text(token, chat_id):
     keyboard.append([InlineKeyboardButton('Меню', callback_data='menu')])
     keyboard.append([InlineKeyboardButton('Выбор доставки', callback_data='delivery_choice')])
     reply_markup = InlineKeyboardMarkup(keyboard)
-    message += f'\nВсего к оплате: {total_amount} руб'
+    message += f'\nВсего к оплате: {cart["total_amount"]} руб'
 
-    return reply_markup, message, cart, total_amount
+    return reply_markup, message, cart
 
 
 def get_location_keyboard_and_text(token, lon, lat):
@@ -106,3 +106,35 @@ def get_location_keyboard_and_text(token, lon, lat):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     return reply_markup, message, pizzeria
+
+
+def get_delivery_keyboard_and_text(token, chat_id, pizzeria, cart):
+    moltin_bot_function.fill_customer_fields(chat_id, pizzeria['client_lat'], pizzeria['client_lon'], token)
+
+    customer_message = dedent('''
+    Спасибо за выбор нашей пиццы!
+    Ваш заказ:
+    ''')
+
+    message = ''
+    for product in cart['items']:
+        order = dedent(f'''
+            Пицца {product['name']}
+            {product['description']}
+            По цене {product['price']} руб - {product['quantity']} шт
+
+            ''')
+        message += order
+    customer_message = customer_message + message + f'Всего к оплате: {cart["total_amount"]} руб'
+    keyboard = [
+        [InlineKeyboardButton('Оплата наличными', callback_data='cash')],
+        [InlineKeyboardButton('Оплата картой', callback_data='card')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    delivery_message = dedent(f'''
+    Получен заказ:
+    {message} Доставка вот по этому адресу
+    ''')
+
+    return reply_markup, customer_message, delivery_message
