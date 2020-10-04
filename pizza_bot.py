@@ -16,7 +16,6 @@ from moltin_bot_function import add_product_to_cart, remove_cart_items
 from moltin_bot_function import get_cart_items, create_customer
 from moltin_bot_function import get_image_url
 from moltin_bot_function import get_all_entries
-from moltin_flow import fill_customer_fields
 from fetch_coordinates import fetch_coordinates
 from closest_pizzeria import get_closest_pizzeria
 import keyboard
@@ -31,7 +30,6 @@ moltin_token_expires = 0
 menu_page_number = 0
 products = []
 cart = []
-total_amount = 0
 pizzeria = {}
 
 def start(update, context):
@@ -92,7 +90,6 @@ def handle_description(update, context):
 
 def handle_cart(update, context):
     global cart
-    global total_amount
     check_access_token()
     query = update.callback_query
     chat_id = query.message.chat_id
@@ -103,7 +100,7 @@ def handle_cart(update, context):
                           product_id=product_id, 
                           chat_id=chat_id)
     
-    reply_markup, message, cart, total_amount = keyboard.get_cart_keyboard_and_text(moltin_token, chat_id)
+    reply_markup, message, cart = keyboard.get_cart_keyboard_and_text(moltin_token, chat_id)
 
     context.bot.send_message(chat_id=chat_id, 
                      text=message, 
@@ -147,36 +144,14 @@ def handle_location(update, context):
 
 
 def handle_delivery(update, context):
+    check_access_token()
     query = update.callback_query
     chat_id = query.message.chat_id
 
-    fill_customer_fields(chat_id, pizzeria['client_lat'], pizzeria['client_lon'], moltin_token)
+    reply_markup, customer_message, delivery_message = keyboard.get_delivery_keyboard_and_text(moltin_token, chat_id, pizzeria, cart)
 
-    customer_message = dedent('''
-    Спасибо за выбор нашей пиццы!
-    Ваш заказ:
-    ''')
-    message = ''
-    for product in cart:
-        order = dedent(f'''
-            Пицца {product['name']}
-            {product['description']}
-            По цене {product['price']} руб - {product['quantity']} шт
-
-            ''')
-        message += order
-    customer_message = customer_message + message + f'Всего к оплате: {total_amount} руб'
-    keyboard = [
-        [InlineKeyboardButton('Оплата наличными', callback_data='cash')],
-        [InlineKeyboardButton('Оплата картой', callback_data='card')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
     query.edit_message_text(customer_message, reply_markup=reply_markup)
 
-    delivery_message = dedent(f'''
-    Получен заказ:
-    {message} Доставка вот по этому адресу
-    ''')
     context.bot.send_message(chat_id=pizzeria['deliveryman'], text=delivery_message)
     context.bot.send_location(chat_id=pizzeria['deliveryman'], 
                               latitude=pizzeria['client_lat'], 
@@ -188,8 +163,8 @@ def handle_delivery(update, context):
 def handle_payment(update, context):
     query = update.callback_query 
     chat_id = query.message.chat_id
-    amount = int(total_amount)
-    payment.start_without_shipping_callback(update, context, amount) 
+    amount = cart['total_amount']
+    payment.start_payment(update, context, amount) 
 
     return 'FINISH'
     
