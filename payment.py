@@ -9,7 +9,7 @@ env = Env()
 env.read_env()
 
 
-def start_without_shipping_callback(update, context, price):
+def start_payment(update, context, price):
     query = update.callback_query 
     chat_id = query.message.chat_id
     title = "Пицца"
