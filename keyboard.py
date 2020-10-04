@@ -3,7 +3,7 @@ from textwrap import dedent
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from more_itertools import chunked
 
-import moltin_bot_function
+import moltin
 import closest_pizzeria
 
 
@@ -18,15 +18,15 @@ def get_menu_keyboard(products, menu_page_number):
     products_keyboard = [
         [InlineKeyboardButton(product['name'], callback_data=product['id'])] for product in products_menu_page[menu_page_number]
         ]
-    products_keyboard.append([InlineKeyboardButton('<--', callback_data='prev'),
-                              InlineKeyboardButton('-->', callback_data='next')])
+    products_keyboard.append([InlineKeyboardButton('<--', callback_data='-1'),
+                              InlineKeyboardButton('-->', callback_data='1')])
     products_keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
-    return InlineKeyboardMarkup(products_keyboard)
+    return InlineKeyboardMarkup(products_keyboard), menu_page_number
 
 
 def get_product_keyboard_and_text(products, product_id, token):
     product = next((product for product in products if product['id'] == product_id))
-    image = moltin_bot_function.get_image_url(token, product['image_id'])
+    image = moltin.get_image_url(token, product['image_id'])
 
     product_keyboard = [
         [InlineKeyboardButton(f'Выбрать - {product["name"]}', callback_data=f'{product_id}')],
@@ -43,7 +43,7 @@ def get_product_keyboard_and_text(products, product_id, token):
 
 
 def get_cart_keyboard_and_text(token, chat_id):
-    cart = moltin_bot_function.get_cart_items(token, chat_id)
+    cart = moltin.get_cart_items(token, chat_id)
     message = ''
     keyboard = []
     for product in cart['items']:
@@ -67,7 +67,7 @@ def get_cart_keyboard_and_text(token, chat_id):
 
 
 def get_location_keyboard_and_text(token, lon, lat):
-    pizzerias = moltin_bot_function.get_all_entries(token)    
+    pizzerias = moltin.get_all_entries(token)    
     pizzeria = closest_pizzeria.get_closest_pizzeria(lon, lat, pizzerias)
 
     if pizzeria['distance'] > 20:
@@ -82,7 +82,7 @@ def get_location_keyboard_and_text(token, lon, lat):
         ]
     else:
         keyboard = [
-            [InlineKeyboardButton('Самовывоз', callback_data='finish')],
+            [InlineKeyboardButton('Самовывоз', callback_data='self')],
             [InlineKeyboardButton('Доставка', callback_data='delivery')]
         ]
         if pizzeria['distance'] <= 0.5:
@@ -109,7 +109,7 @@ def get_location_keyboard_and_text(token, lon, lat):
 
 
 def get_delivery_keyboard_and_text(token, chat_id, pizzeria, cart):
-    moltin_bot_function.fill_customer_fields(chat_id, pizzeria['client_lat'], pizzeria['client_lon'], token)
+    moltin.fill_customer_fields(chat_id, pizzeria['client_lat'], pizzeria['client_lon'], token)
 
     customer_message = dedent('''
     Спасибо за выбор нашей пиццы!
