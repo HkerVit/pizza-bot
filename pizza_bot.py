@@ -1,23 +1,18 @@
 import logging
 from textwrap import dedent
 import time
-import json
 
 import redis
 from telegram.ext import Filters, Updater
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
-from telegram.ext import (Filters, PreCheckoutQueryHandler)
+from telegram.ext import Filters, PreCheckoutQueryHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from environs import Env
 
 from moltin_token import get_access_token
-from moltin_bot_function import get_products_list
-from moltin_bot_function import add_product_to_cart, remove_cart_items
-from moltin_bot_function import get_cart_items, create_customer
-from moltin_bot_function import get_image_url
-from moltin_bot_function import get_all_entries
 from fetch_coordinates import fetch_coordinates
 from closest_pizzeria import get_closest_pizzeria
+import moltin
 import keyboard
 import payment
 
@@ -33,18 +28,21 @@ cart = []
 pizzeria = {}
 
 def start(update, context):
+    global products
+    global menu_page_number
+    check_access_token()
+
     query = update.callback_query
     if query:
         chat_id = query.message.chat_id
+        menu_page_number += int(query.data)
     else:
         chat_id = update.message.chat_id
 
-    check_access_token()
     if time.time() >= moltin_token_expires or len(products) == 0:
-        moltin_product_info = get_products_list(token=moltin_token)
-        get_all_products(moltin_product_info)
+        products = moltin.get_products_list(token=moltin_token)
 
-    reply_markup = keyboard.get_menu_keyboard(products, menu_page_number)
+    reply_markup, menu_page_number = keyboard.get_menu_keyboard(products, menu_page_number)
     context.bot.send_message(chat_id=chat_id, text='Пожалуйста, выберите пиццу:',
                      reply_markup=reply_markup)
     if query:
@@ -60,8 +58,6 @@ def handle_menu(update, context):
     chat_id = query.message.chat_id
 
     product_id = query.data
-    product = next((product for product in products if product['id'] == product_id))
-
     reply_markup, message, image = keyboard.get_product_keyboard_and_text(products, product_id, moltin_token)
 
     context.bot.send_photo(chat_id=chat_id, photo=image,
@@ -78,7 +74,7 @@ def handle_description(update, context):
     product_id = query.data
 
     product = next((product for product in products if product['id'] == product_id))
-    add_product_to_cart(token=moltin_token,
+    moltin.add_product_to_cart(token=moltin_token,
                         product_id=product['id'],
                         quantity=1,
                         chat_id=chat_id)
@@ -96,7 +92,7 @@ def handle_cart(update, context):
 
     if 'remove' in query.data:
         product_id = query.data.split(',')[1]
-        remove_cart_items(token=moltin_token, 
+        moltin.remove_cart_items(token=moltin_token, 
                           product_id=product_id, 
                           chat_id=chat_id)
     
@@ -140,7 +136,7 @@ def handle_location(update, context):
     reply_markup, message, pizzeria = keyboard.get_location_keyboard_and_text(moltin_token, lon, lat)
     update.message.reply_text(message, reply_markup=reply_markup)
 
-    return 'FINISH'
+    return 'HANDLE_DELIVERY'
 
 
 def handle_delivery(update, context):
@@ -167,16 +163,6 @@ def handle_payment(update, context):
     payment.start_payment(update, context, amount) 
 
     return 'FINISH'
-    
-
-def delivery_notification(context):
-    message = dedent(f'''
-    Приятного аппетита! *место для рекламы*
-
-    *сообщение что делать если пицца не пришла*
-    ''')
-    job = context.job
-    context.bot.send_message(job.context, text=message)
 
 
 def finish(update, context):
@@ -199,11 +185,20 @@ def finish(update, context):
 
     update.message.reply_text(text='Спасибо за покупку нашей пиццы!')
     context.job_queue.run_once(delivery_notification, 15, context=update.message.chat_id)
+
     return 'FINISH'
 
 
+def delivery_notification(context):
+    message = dedent(f'''
+    Приятного аппетита! *место для рекламы*\n
+    *сообщение что делать если пицца не пришла*
+    ''')
+    job = context.job
+    context.bot.send_message(job.context, text=message)
+
+
 def handle_users_reply(update, context):
-    global menu_page_number
     query = update.callback_query
     db = get_database_connection()
 
@@ -216,22 +211,18 @@ def handle_users_reply(update, context):
     else:
         return
 
-    if user_reply == '/start':
+    if user_reply == '/start' or user_reply == 'menu':
         user_state = 'START'
     elif user_reply == 'cart':
         user_state = 'HANDLE_CART'
     elif user_reply == 'delivery_choice':
         user_state = 'HANDLE_WAITING'
-    elif user_reply == 'menu':
+    elif user_reply == '-1' or user_reply == '1':
         user_state = 'START'
-    elif user_reply == 'next':
-        user_state = 'START'
-        menu_page_number += 1
-    elif user_reply == 'prev':
-        user_state = 'START'
-        menu_page_number -= 1
-    elif user_reply == 'delivery':
-        user_state = 'HANDLE_DELIVERY'
+    elif user_reply == 'close':
+        user_state = 'FINISH'
+    elif user_reply == 'self':
+        user_state = 'HANDLE_PAYMENT'
     else:
         user_state = db.get(chat_id).decode("utf-8")
 
@@ -253,28 +244,6 @@ def handle_users_reply(update, context):
         db.set(chat_id, next_state)
     except Exception as err:
         logging.exception(err)
-
-
-def get_all_products(moltin_products_info):
-    global products
-    for product in moltin_products_info:
-        products.append({
-                'name': product['name'],
-                'id': product['id'],
-                'description': product['description'],
-                'price': product['meta']['display_price']['with_tax']['formatted'],
-                'image_id': product['relationships']['main_image']['data']['id']
-            })
-
-
-def get_product_by_id(product_id):
-    global products
-    for count, product in enumerate(products):
-        if product_id == product['id']:
-            return product, count
-    
-    return None
-
 
 
 def get_database_connection():
