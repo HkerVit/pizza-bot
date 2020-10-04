@@ -61,27 +61,6 @@ def create_flow_fields(token):
     response.raise_for_status()
 
 
-def fill_customer_fields(client_id, lat, lon, token):
-    headers = {
-        'Authorization': f'{token}',
-        'Content-Type': 'application/json',
-    }
-
-    data = { 
-        "data": { 
-            "type": "entry", 
-            "client-id": client_id,
-            "longitude": lon,
-            "latitude": lat,
-            } 
-        }
-
-    url = 'https://api.moltin.com/v2/flows/customer-address/entries'
-
-    response = requests.post(url, headers=headers, data=json.dumps(data))
-    response.raise_for_status()
-
-
 def get_all_entries():
     headers = {
         'Authorization': f'Bearer {token}',
@@ -124,21 +103,4 @@ def update_entire(entire_id):
     url = f'https://api.moltin.com/v2/flows/pizzeria/entries/{entire_id}'
     response = requests.put(url, headers=headers, data=json.dumps(data))
     response.raise_for_status()
-
-
-def check_access_token():
-    global token
-    global token_time
-    curent_time = time.time()
-
-    if curent_time >= token_time:
-        token, token_time = get_access_token()
-
-
-if __name__ == "__main__":
-    check_access_token()
-    pizzerias = get_all_entries()
-
-    for pizzeria in pizzerias:
-        update_entire(pizzeria['id'])
     
