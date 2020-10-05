@@ -130,8 +130,9 @@ def handle_location(update, context):
         lat = update.message.location.latitude
         lon = update.message.location.longitude
 
-    reply_markup, message, pizzeria = keyboard.get_location_keyboard_and_text(moltin_token, lon, lat)
+    reply_markup, message, pizzeria, delivery_fee = keyboard.get_location_keyboard_and_text(moltin_token, lon, lat)
     update.message.reply_text(message, reply_markup=reply_markup)
+    cart['delivery_fee'] = delivery_fee
 
     return 'HANDLE_DELIVERY'
 
@@ -148,19 +149,14 @@ def handle_delivery(update, context):
     context.bot.send_location(chat_id=pizzeria['deliveryman'], 
                               latitude=pizzeria['client_lat'], 
                               longitude=pizzeria['client_lon'])
-       
+    context.job_queue.run_once(delivery_notification, 60, context=query.message.chat_id) 
     return 'HANDLE_PAYMENT'
 
 
 def handle_payment(update, context):
     query = update.callback_query 
     chat_id = query.message.chat_id
-    amount = cart['total_amount']
-    if query.data == 'card':
-        payment.start_payment(update, context, amount)
-    else:
-        
-
+    payment.start_payment(update, context, cart['total_amount'])
     return 'FINISH'
 
 
@@ -168,10 +164,12 @@ def finish(update, context):
     query = update.callback_query
 
     if query:
-        query.edit_message_text('Good bye')
+        if query.data == 'cash':
+            context.bot.send_message(chat_id=query.message.chat_id, text=f'Отлично, тогда с Вас {cart["total_amount"]} руб.')
+        else:
+            query.edit_message_text('Очень жаль, что не удалось Вам помочь')
     else:
-        update.message.reply_text(text='Спасибо за покупку нашей пиццы!')
-        context.job_queue.run_once(delivery_notification, 15, context=update.message.chat_id)
+        update.message.reply_text(text='Еще раз спасибо за выбор нашей пиццы!')
 
     return 'FINISH'
 
@@ -206,7 +204,7 @@ def handle_users_reply(update, context):
         user_state = 'HANDLE_CART'
     elif user_reply == 'delivery_choice':
         user_state = 'HANDLE_WAITING'
-    elif user_reply == 'close':
+    elif user_reply == 'close' or user_reply == 'cash':
         user_state = 'FINISH'
     else:
         user_state = db.get(chat_id).decode("utf-8")
