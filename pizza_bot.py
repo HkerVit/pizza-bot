@@ -35,7 +35,10 @@ def start(update, context):
     query = update.callback_query
     if query:
         chat_id = query.message.chat_id
-        menu_page_number += int(query.data)
+        if query.data == 'menu':
+            menu_page_number = 0
+        else:
+            menu_page_number += int(query.data)
     else:
         chat_id = update.message.chat_id
 
@@ -98,20 +101,14 @@ def handle_cart(update, context):
     
     reply_markup, message, cart = keyboard.get_cart_keyboard_and_text(moltin_token, chat_id)
 
-    context.bot.send_message(chat_id=chat_id, 
-                     text=message, 
-                     reply_markup=reply_markup)
-
-    context.bot.delete_message(chat_id=query.message.chat_id, 
-                       message_id=query.message.message_id)
+    query.edit_message_text(text=message, reply_markup=reply_markup)
 
     return 'HANDLE_CART'
 
 
 def handle_waiting(update, context):
     query = update.callback_query
-    context.bot.send_message(chat_id=query.message.chat_id, 
-                text='Пожалуйста, напишите адрес текстом или пришлите локацию')
+    query.edit_message_text('Пожалуйста, напишите адрес текстом или пришлите локацию')
 
     return 'HANDLE_LOCATION'
 
@@ -142,9 +139,8 @@ def handle_location(update, context):
 def handle_delivery(update, context):
     check_access_token()
     query = update.callback_query
-    chat_id = query.message.chat_id
-
-    reply_markup, customer_message, delivery_message = keyboard.get_delivery_keyboard_and_text(moltin_token, chat_id, pizzeria, cart)
+    
+    reply_markup, customer_message, delivery_message = keyboard.get_delivery_keyboard_and_text(moltin_token, query, pizzeria, cart)
 
     query.edit_message_text(customer_message, reply_markup=reply_markup)
 
@@ -160,7 +156,10 @@ def handle_payment(update, context):
     query = update.callback_query 
     chat_id = query.message.chat_id
     amount = cart['total_amount']
-    payment.start_payment(update, context, amount) 
+    if query.data == 'card':
+        payment.start_payment(update, context, amount)
+    else:
+        
 
     return 'FINISH'
 
@@ -169,22 +168,10 @@ def finish(update, context):
     query = update.callback_query
 
     if query:
-        if query.data == 'close':
-            query.edit_message_text('Good bye')
-        else:
-            chat_id = query.message.chat_id
-            lat = pizzeria['lat']
-            lon = pizzeria['lon']
-            message = dedent(f'''
-            Спасибо за то, что выбрали нас.
-            Ближайшая к вам пиццерия находится по адресу: 
-            {pizzeria['address']}
-            ''')
-            query.edit_message_text(message)
-            context.bot.send_location(chat_id=chat_id, latitude=lat, longitude=lon)
-
-    update.message.reply_text(text='Спасибо за покупку нашей пиццы!')
-    context.job_queue.run_once(delivery_notification, 15, context=update.message.chat_id)
+        query.edit_message_text('Good bye')
+    else:
+        update.message.reply_text(text='Спасибо за покупку нашей пиццы!')
+        context.job_queue.run_once(delivery_notification, 15, context=update.message.chat_id)
 
     return 'FINISH'
 
@@ -213,16 +200,14 @@ def handle_users_reply(update, context):
 
     if user_reply == '/start' or user_reply == 'menu':
         user_state = 'START'
+    elif user_reply == '-1' or user_reply == '1':
+        user_state = 'START'
     elif user_reply == 'cart':
         user_state = 'HANDLE_CART'
     elif user_reply == 'delivery_choice':
         user_state = 'HANDLE_WAITING'
-    elif user_reply == '-1' or user_reply == '1':
-        user_state = 'START'
     elif user_reply == 'close':
         user_state = 'FINISH'
-    elif user_reply == 'self':
-        user_state = 'HANDLE_PAYMENT'
     else:
         user_state = db.get(chat_id).decode("utf-8")
 
