@@ -108,15 +108,22 @@ def get_location_keyboard_and_text(token, lon, lat):
     return reply_markup, message, pizzeria
 
 
-def get_delivery_keyboard_and_text(token, chat_id, pizzeria, cart):
+def get_delivery_keyboard_and_text(token, query, pizzeria, cart):
+    chat_id = query.message.chat_id
+
     moltin.fill_customer_fields(chat_id, pizzeria['client_lat'], pizzeria['client_lon'], token)
 
-    customer_message = dedent('''
-    Спасибо за выбор нашей пиццы!
-    Ваш заказ:
-    ''')
+    message = 'Спасибо за выбор нашей пиццы!\n'
+    if query.data == 'self':
+        lat = pizzeria['lat']
+        lon = pizzeria['lon']
+        self_delivery_message = dedent(f'''
+        Ближайшая к вам пиццерия находится по адресу: 
+        {pizzeria['address']}\n
+        ''')
+        message += self_delivery_message
 
-    message = ''
+    order_message = 'Ваш заказ:\n'
     for product in cart['items']:
         order = dedent(f'''
             Пицца {product['name']}
@@ -124,8 +131,8 @@ def get_delivery_keyboard_and_text(token, chat_id, pizzeria, cart):
             По цене {product['price']} руб - {product['quantity']} шт
 
             ''')
-        message += order
-    customer_message = customer_message + message + f'Всего к оплате: {cart["total_amount"]} руб'
+        order_message += order
+    message = message + order_message + f'Всего к оплате: {cart["total_amount"]} руб'
     keyboard = [
         [InlineKeyboardButton('Оплата наличными', callback_data='cash')],
         [InlineKeyboardButton('Оплата картой', callback_data='card')]
@@ -134,7 +141,7 @@ def get_delivery_keyboard_and_text(token, chat_id, pizzeria, cart):
 
     delivery_message = dedent(f'''
     Получен заказ:
-    {message} Доставка вот по этому адресу
+    {order_message} Доставка вот по этому адресу
     ''')
 
-    return reply_markup, customer_message, delivery_message
+    return reply_markup, message, delivery_message
