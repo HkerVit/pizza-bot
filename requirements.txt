@@ -4,5 +4,4 @@ python_telegram_bot==12.8
 requests==2.24.0
 email_validator==1.1.1
 Pillow==7.2.0
-telegram==0.0.1
 unicode_slugify==0.1.3
