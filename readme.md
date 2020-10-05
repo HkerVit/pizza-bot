@@ -56,9 +56,17 @@ From your command line:
 ```shell
 python pizza_bot.py
 ```
+
 Usage example:
 
 ![screenshot](screenshot/pizza_bot.gif)
+
+This bot was deployed to Heroku. You can find this bot in Telegram by username: `@pizza_super_bot` and try its work. For payment you can use test credit card:
+
+```
+1111 1111 1111 1026
+12/22 000
+```
 
 ## Description of files
 
