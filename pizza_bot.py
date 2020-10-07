@@ -138,10 +138,11 @@ def handle_location(update, context):
 
 
 def handle_delivery(update, context):
+    global cart
     check_access_token()
     query = update.callback_query
     
-    reply_markup, customer_message, delivery_message = keyboard.get_delivery_keyboard_and_text(moltin_token, query, pizzeria, cart)
+    reply_markup, customer_message, delivery_message, cart = keyboard.get_delivery_keyboard_and_text(moltin_token, query, pizzeria, cart)
 
     query.edit_message_text(customer_message, reply_markup=reply_markup)
 
@@ -165,7 +166,10 @@ def finish(update, context):
 
     if query:
         if query.data == 'cash':
-            context.bot.send_message(chat_id=query.message.chat_id, text=f'Отлично, тогда с Вас {cart["total_amount"]} руб.')
+            context.bot.send_message(chat_id=query.message.chat_id, text=f'Отлично, при получении пиццы оплатите курьеру {cart["total_amount"]} руб')
+            if cart['delivery']:
+                text = f'Оплата наличными при получении пиццы - {cart["total_amount"]} руб'
+                context.bot.send_message(chat_id=pizzeria['deliveryman'], text=text)
         else:
             query.edit_message_text('Очень жаль, что не удалось Вам помочь')
     else:

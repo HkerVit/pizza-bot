@@ -80,6 +80,7 @@ def get_location_keyboard_and_text(token, lon, lat):
             [InlineKeyboardButton('Завершить заказ', callback_data='close')],
             [InlineKeyboardButton('Изменить заказ', callback_data='cart')]
         ]
+        delivery_fee=-1
     else:
         keyboard = [
             [InlineKeyboardButton('Самовывоз', callback_data='self')],
@@ -125,6 +126,7 @@ def get_delivery_keyboard_and_text(token, query, pizzeria, cart):
         {pizzeria['address']}\n
         ''')
         message += self_delivery_message
+        cart['delivery'] = False
 
     order_message = 'Ваш заказ:\n'
     for product in cart['items']:
@@ -134,11 +136,13 @@ def get_delivery_keyboard_and_text(token, query, pizzeria, cart):
             По цене {product['price']} руб - {product['quantity']} шт\n
             ''')
         order_message += order
-    if cart['delivery_fee'] > 0:
-        order_message += f'Стоимость доставки - {cart["delivery_fee"]} руб\n\n'
+    if query.data == 'delivery':
+        cart['delivery'] = True
+        if cart['delivery_fee'] > 0:
+            order_message += f'Стоимость доставки - {cart["delivery_fee"]} руб\n\n'
+            cart['total_amount'] = cart['total_amount'] + cart['delivery_fee']
 
-    total_amount = cart['total_amount'] + cart['delivery_fee']
-    message = message + order_message + f'Всего к оплате: {total_amount} руб'
+    message = message + order_message + f'Всего к оплате: {cart["total_amount"]} руб'
     keyboard = [
         [InlineKeyboardButton('Оплата наличными', callback_data='cash')],
         [InlineKeyboardButton('Оплата картой', callback_data='card')]
@@ -147,7 +151,7 @@ def get_delivery_keyboard_and_text(token, query, pizzeria, cart):
 
     delivery_message = dedent(f'''
     Получен заказ:
-    {order_message} Доставка вот по этому адресу
+    {order_message}Итого к оплате {cart["total_amount"]} руб. Доставка по этому адресу:
     ''')
 
-    return reply_markup, message, delivery_message
+    return reply_markup, message, delivery_message, cart
