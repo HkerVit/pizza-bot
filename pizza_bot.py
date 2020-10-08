@@ -155,15 +155,18 @@ def handle_payment(update, context):
     if query.data == 'cash':
         keyboard = [[InlineKeyboardButton(f'Подтверждаю', callback_data='cash_confirm')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        message = dedent(f'''
-        К оплате наличными  - {cart["total_amount"]} руб
-        Деньги, пожалуйста, передайте курьеру. Не забудьте взять чек!
-        ''')
-        context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
-
         if cart['delivery']:
+            message = dedent(f'''
+                    К оплате наличными  - {cart["total_amount"]} руб
+                    Деньги, пожалуйста, передайте курьеру. Не забудьте взять чек!
+                    ''')
+            context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
             return 'HANDLE_DELIVERYMAN'
         else:
+            message = dedent(f'''
+                    К оплате наличными  - {cart["total_amount"]} руб
+                    ''')
+            context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
             return 'FINISH'
 
     elif query.data == 'card':
@@ -177,20 +180,20 @@ def handle_payment(update, context):
 
 def handle_deliveryman(update, context):
     query = update.callback_query
-
-    if query:
-        if query.data == 'cash_confirm':
-            message = dedent(f'''
+    message = dedent(f'''
             Cпасибо за выбор нашей пиццы!
             Курьер пиццу доставит в течении часа.
             ''')
-            query.edit_message_text(message)
-            context.bot.send_message(chat_id=pizzeria['deliveryman'], text=cart['delivery_message'])
-            context.bot.send_location(chat_id=pizzeria['deliveryman'],
-                                      latitude=pizzeria['client_lat'],
-                                      longitude=pizzeria['client_lon'])
+    query.edit_message_text(message)
+
+    context.bot.send_message(chat_id=pizzeria['deliveryman'], text=cart['delivery_message'])
+    context.bot.send_location(chat_id=pizzeria['deliveryman'],
+                              latitude=pizzeria['client_lat'],
+                              longitude=pizzeria['client_lon'])
 
     context.job_queue.run_once(delivery_notification, 60, context=query.message.chat_id)
+
+    return 'HANDLE_DELIVERYMAN'
 
 
 def finish(update, context):
@@ -208,7 +211,7 @@ def finish(update, context):
            Cпасибо за выбор нашей пиццы!\n
            Ближайшая к вам пиццерия находится по адресу: 
            {pizzeria['address']}\n
-           С нетерпением ждем Вас
+           С нетерпением ждем Вас!
            ''')
         if query:
             query.edit_message_text(message)
@@ -313,7 +316,7 @@ if __name__ == '__main__':
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.location, handle_users_reply))
     dispatcher.add_handler(MessageHandler(Filters.location, handle_users_reply))
     dispatcher.add_handler(PreCheckoutQueryHandler(payment.precheckout_callback))
-    dispatcher.add_handler(MessageHandler(Filters.successful_payment, finish))
+    dispatcher.add_handler(MessageHandler(Filters.successful_payment, payment.successful_payment_callback))
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
 
     updater.start_polling()

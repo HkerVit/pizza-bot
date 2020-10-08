@@ -1,9 +1,6 @@
-import logging
-
 from environs import Env
-from telegram import (LabeledPrice, ShippingOption)
-from telegram.ext import (Updater, CommandHandler, MessageHandler,
-                          Filters, PreCheckoutQueryHandler, ShippingQueryHandler)
+from telegram import (LabeledPrice)
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 env = Env()
 env.read_env()
@@ -31,3 +28,10 @@ def precheckout_callback(update, context):
         query.answer(ok=False, error_message="Что-то пошло не так...")
     else:
         query.answer(ok=True)
+
+
+def successful_payment_callback(update, context):
+    keyboard = [[InlineKeyboardButton(f'Продолжить', callback_data='card_confirm')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text("Спасибо за Вашу оплату!", reply_markup=reply_markup)
+    context.bot.delete_message(chat_id=update.message.chat_id, message_id=update.message.message_id)
