@@ -3,7 +3,7 @@ from textwrap import dedent
 import time
 
 import redis
-from telegram.ext import Filters, Updater
+from telegram.ext import Updater
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 from telegram.ext import Filters, PreCheckoutQueryHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -11,7 +11,6 @@ from environs import Env
 
 from moltin_token import get_access_token
 from fetch_coordinates import fetch_coordinates
-from closest_pizzeria import get_closest_pizzeria
 import moltin
 import keyboard
 import payment
@@ -26,6 +25,7 @@ menu_page_number = 0
 products = []
 cart = []
 pizzeria = {}
+
 
 def start(update, context):
     global products
@@ -47,10 +47,10 @@ def start(update, context):
 
     reply_markup, menu_page_number = keyboard.get_menu_keyboard(products, menu_page_number)
     context.bot.send_message(chat_id=chat_id, text='Пожалуйста, выберите пиццу:',
-                     reply_markup=reply_markup)
+                             reply_markup=reply_markup)
     if query:
-        context.bot.delete_message(chat_id=chat_id, 
-                           message_id=query.message.message_id)
+        context.bot.delete_message(chat_id=chat_id,
+                                   message_id=query.message.message_id)
 
     return 'HANDLE_MENU'
 
@@ -64,7 +64,7 @@ def handle_menu(update, context):
     reply_markup, message, image = keyboard.get_product_keyboard_and_text(products, product_id, moltin_token)
 
     context.bot.send_photo(chat_id=chat_id, photo=image,
-                   caption=message, reply_markup=reply_markup)
+                           caption=message, reply_markup=reply_markup)
     context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
 
     return 'HANDLE_DESCRIPTION'
@@ -78,9 +78,9 @@ def handle_description(update, context):
 
     product = next((product for product in products if product['id'] == product_id))
     moltin.add_product_to_cart(token=moltin_token,
-                        product_id=product['id'],
-                        quantity=1,
-                        chat_id=chat_id)
+                               product_id=product['id'],
+                               quantity=1,
+                               chat_id=chat_id)
     message = f'Добавлена {product["name"]} в корзину'
     context.bot.answer_callback_query(callback_query_id=query.id, text=message)
 
@@ -95,10 +95,10 @@ def handle_cart(update, context):
 
     if 'remove' in query.data:
         product_id = query.data.split(',')[1]
-        moltin.remove_cart_items(token=moltin_token, 
-                          product_id=product_id, 
-                          chat_id=chat_id)
-    
+        moltin.remove_cart_items(token=moltin_token,
+                                 product_id=product_id,
+                                 chat_id=chat_id)
+
     reply_markup, message, cart = keyboard.get_cart_keyboard_and_text(moltin_token, chat_id)
 
     query.edit_message_text(text=message, reply_markup=reply_markup)
@@ -122,8 +122,8 @@ def handle_location(update, context):
         try:
             lon, lat = fetch_coordinates(update.message.text)
         except IndexError:
-            context.bot.send_message(chat_id=chat_id, 
-                        text='К сожалению не удалось определить локацию. Попробуйте еще раз')
+            context.bot.send_message(chat_id=chat_id,
+                                     text='К сожалению не удалось определить локацию. Попробуйте еще раз')
             return 'HANDLE_LOCATION'
 
     else:
@@ -141,39 +141,84 @@ def handle_delivery(update, context):
     global cart
     check_access_token()
     query = update.callback_query
-    
-    reply_markup, customer_message, delivery_message, cart = keyboard.get_delivery_keyboard_and_text(moltin_token, query, pizzeria, cart)
 
+    reply_markup, customer_message, cart = keyboard.get_delivery_keyboard_and_text(moltin_token, query, pizzeria, cart)
     query.edit_message_text(customer_message, reply_markup=reply_markup)
 
-    context.bot.send_message(chat_id=pizzeria['deliveryman'], text=delivery_message)
-    context.bot.send_location(chat_id=pizzeria['deliveryman'], 
-                              latitude=pizzeria['client_lat'], 
-                              longitude=pizzeria['client_lon'])
-    context.job_queue.run_once(delivery_notification, 60, context=query.message.chat_id) 
     return 'HANDLE_PAYMENT'
 
 
 def handle_payment(update, context):
-    query = update.callback_query 
+    query = update.callback_query
     chat_id = query.message.chat_id
-    payment.start_payment(update, context, cart['total_amount'])
-    return 'FINISH'
+
+    if query.data == 'cash':
+        keyboard = [[InlineKeyboardButton(f'Подтверждаю', callback_data='cash_confirm')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        message = dedent(f'''
+        К оплате наличными  - {cart["total_amount"]} руб
+        Деньги, пожалуйста, передайте курьеру. Не забудьте взять чек!
+        ''')
+        context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
+
+        if cart['delivery']:
+            return 'HANDLE_DELIVERYMAN'
+        else:
+            return 'FINISH'
+
+    elif query.data == 'card':
+        payment.start_payment(update, context, cart['total_amount'])
+
+        if cart['delivery']:
+            return 'HANDLE_DELIVERYMAN'
+        else:
+            return 'FINISH'
+
+
+def handle_deliveryman(update, context):
+    query = update.callback_query
+
+    if query:
+        if query.data == 'cash_confirm':
+            message = dedent(f'''
+            Cпасибо за выбор нашей пиццы!
+            Курьер пиццу доставит в течении часа.
+            ''')
+            query.edit_message_text(message)
+            context.bot.send_message(chat_id=pizzeria['deliveryman'], text=cart['delivery_message'])
+            context.bot.send_location(chat_id=pizzeria['deliveryman'],
+                                      latitude=pizzeria['client_lat'],
+                                      longitude=pizzeria['client_lon'])
+
+    context.job_queue.run_once(delivery_notification, 60, context=query.message.chat_id)
 
 
 def finish(update, context):
     query = update.callback_query
 
     if query:
-        if query.data == 'cash':
-            context.bot.send_message(chat_id=query.message.chat_id, text=f'Отлично, при получении пиццы оплатите курьеру {cart["total_amount"]} руб')
-            if cart['delivery']:
-                text = f'Оплата наличными при получении пиццы - {cart["total_amount"]} руб'
-                context.bot.send_message(chat_id=pizzeria['deliveryman'], text=text)
-        else:
+        chat_id = query.message.chat_id
+        if query.data == 'close':
             query.edit_message_text('Очень жаль, что не удалось Вам помочь')
     else:
-        update.message.reply_text(text='Еще раз спасибо за выбор нашей пиццы!')
+        chat_id = update.message.chat_id
+
+    if not cart['delivery']:
+        message = dedent(f'''
+           Cпасибо за выбор нашей пиццы!\n
+           Ближайшая к вам пиццерия находится по адресу: 
+           {pizzeria['address']}\n
+           С нетерпением ждем Вас
+           ''')
+        if query:
+            query.edit_message_text(message)
+        else:
+            update.message.reply_text(message)
+            context.bot.delete_message(chat_id=chat_id, message_id=update.message.message_id)
+
+        context.bot.send_location(chat_id=chat_id,
+                                  latitude=pizzeria['lat'],
+                                  longitude=pizzeria['lon'])
 
     return 'FINISH'
 
@@ -208,7 +253,7 @@ def handle_users_reply(update, context):
         user_state = 'HANDLE_CART'
     elif user_reply == 'delivery_choice':
         user_state = 'HANDLE_WAITING'
-    elif user_reply == 'close' or user_reply == 'cash':
+    elif user_reply == 'close':
         user_state = 'FINISH'
     else:
         user_state = db.get(chat_id).decode("utf-8")
@@ -222,6 +267,7 @@ def handle_users_reply(update, context):
         'HANDLE_LOCATION': handle_location,
         'HANDLE_DELIVERY': handle_delivery,
         'HANDLE_PAYMENT': handle_payment,
+        'HANDLE_DELIVERYMAN': handle_deliveryman,
         'FINISH': finish,
     }
 

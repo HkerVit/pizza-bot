@@ -7,7 +7,6 @@ import moltin
 import closest_pizzeria
 
 
-
 def get_menu_keyboard(products, menu_page_number):
     products_menu_page = list(chunked(products, 6))
     if menu_page_number < 0:
@@ -16,8 +15,9 @@ def get_menu_keyboard(products, menu_page_number):
         menu_page_number = 0
 
     products_keyboard = [
-        [InlineKeyboardButton(product['name'], callback_data=product['id'])] for product in products_menu_page[menu_page_number]
-        ]
+        [InlineKeyboardButton(product['name'], callback_data=product['id'])] for product in
+        products_menu_page[menu_page_number]
+    ]
     products_keyboard.append([InlineKeyboardButton('<--', callback_data='-1'),
                               InlineKeyboardButton('-->', callback_data='1')])
     products_keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
@@ -31,7 +31,7 @@ def get_product_keyboard_and_text(products, product_id, token):
     product_keyboard = [
         [InlineKeyboardButton(f'Выбрать - {product["name"]}', callback_data=f'{product_id}')],
         [InlineKeyboardButton('Меню', callback_data='menu')],
-        ]
+    ]
     reply_markup = InlineKeyboardMarkup(product_keyboard)
     message = dedent(f'''
     {product['name']}\n
@@ -47,7 +47,8 @@ def get_cart_keyboard_and_text(token, chat_id):
     message = ''
     keyboard = []
     for product in cart['items']:
-        keyboard.append([InlineKeyboardButton(f"Убрать из корзины {product['name']}", callback_data=f"remove,{product['id']}")])
+        keyboard.append(
+            [InlineKeyboardButton(f"Убрать из корзины {product['name']}", callback_data=f"remove,{product['id']}")])
 
         product_output = dedent(f'''
             Пицца {product['name']}
@@ -67,7 +68,7 @@ def get_cart_keyboard_and_text(token, chat_id):
 
 
 def get_location_keyboard_and_text(token, lon, lat):
-    pizzerias = moltin.get_all_entries(token)    
+    pizzerias = moltin.get_all_entries(token)
     pizzeria = closest_pizzeria.get_closest_pizzeria(lon, lat, pizzerias)
 
     if pizzeria['distance'] > 20:
@@ -80,7 +81,7 @@ def get_location_keyboard_and_text(token, lon, lat):
             [InlineKeyboardButton('Завершить заказ', callback_data='close')],
             [InlineKeyboardButton('Изменить заказ', callback_data='cart')]
         ]
-        delivery_fee=-1
+        delivery_fee = -1
     else:
         keyboard = [
             [InlineKeyboardButton('Самовывоз', callback_data='self')],
@@ -106,7 +107,7 @@ def get_location_keyboard_and_text(token, lon, lat):
             находится по адресу: {pizzeria["address"]}. Доставка будет стоить 300 руб.
             Но Вы можете забрать пиццу самостоятельно)''')
             delivery_fee = 300
-    
+
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     return reply_markup, message, pizzeria, delivery_fee
@@ -154,4 +155,6 @@ def get_delivery_keyboard_and_text(token, query, pizzeria, cart):
     {order_message}Итого к оплате {cart["total_amount"]} руб. Доставка по этому адресу:
     ''')
 
-    return reply_markup, message, delivery_message, cart
+    cart['delivery_message'] = delivery_message
+
+    return reply_markup, message, cart
