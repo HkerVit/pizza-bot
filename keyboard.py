@@ -151,7 +151,7 @@ def get_delivery_keyboard_and_text(token, query, pizzeria, cart):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     delivery_message = dedent(f'''
-    Получен заказ:
+    Оплачен заказ:
     {order_message}Итого к оплате {cart["total_amount"]} руб. Доставка по этому адресу:
     ''')
 
