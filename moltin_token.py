@@ -6,8 +6,8 @@ import requests
 env = Env()
 env.read_env()
 
-client_id = env('CLIENT_ID')
-client_secret = env('CLIENT_SECRET_TOKEN')
+client_id = env('MOLTIN_CLIENT_ID')
+client_secret = env('MOLTIN_CLIENT_SECRET_TOKEN')
 
 
 def get_access_token():

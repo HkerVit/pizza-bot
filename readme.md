@@ -24,9 +24,9 @@ You have to create on following resources:
 
 Declare default environment variables in `.env` file:
 
-`CLIENT_ID` - Elasticpath client ID.
+`MOLTIN_CLIENT_ID` - Elasticpath client ID.
 
-`CLIENT_SECRET_TOKEN` - Elasticpath client secret token.
+`MOLTIN_CLIENT_SECRET_TOKEN` - Elasticpath client secret token.
 
 `DATABASE_PASSWORD` - Redis database password.
 
