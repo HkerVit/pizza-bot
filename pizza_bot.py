@@ -18,6 +18,8 @@ import payment
 env = Env()
 env.read_env()
 
+yandex_apikey = env('YANDEX_MAP_KEY')
+
 _database = None
 moltin_token = None
 moltin_token_expires = 0
@@ -120,7 +122,7 @@ def handle_location(update, context):
 
     if update.message.text:
         try:
-            lon, lat = fetch_coordinates(update.message.text)
+            lon, lat = fetch_coordinates(update.message.text, yandex_apikey)
         except IndexError:
             context.bot.send_message(chat_id=chat_id,
                                      text='К сожалению не удалось определить локацию. Попробуйте еще раз')

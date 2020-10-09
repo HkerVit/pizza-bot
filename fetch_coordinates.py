@@ -2,12 +2,10 @@ import requests
 
 from environs import Env
 
-env = Env()
-env.read_env()
 
-def fetch_coordinates(place):
+def fetch_coordinates(place, apikey):
     base_url = "https://geocode-maps.yandex.ru/1.x"
-    params = {"geocode": place, "apikey": env('YANDEX_MAP_KEY'), "format": "json"}
+    params = {"geocode": place, "apikey": apikey, "format": "json"}
     response = requests.get(base_url, params=params)
     response.raise_for_status()
     places_found = response.json()['response']['GeoObjectCollection']['featureMember']
