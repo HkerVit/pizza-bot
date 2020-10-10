@@ -8,15 +8,15 @@ import closest_pizzeria
 
 
 def get_menu_keyboard(products, menu_page_number):
-    products_menu_page = list(chunked(products, 6))
+    products_menu_pages = list(chunked(products, 6))
     if menu_page_number < 0:
-        menu_page_number = len(products_menu_page) - 1
-    if menu_page_number >= len(products_menu_page):
+        menu_page_number = len(products_menu_pages) - 1
+    if menu_page_number >= len(products_menu_pages):
         menu_page_number = 0
 
     products_keyboard = [
         [InlineKeyboardButton(product['name'], callback_data=product['id'])] for product in
-        products_menu_page[menu_page_number]
+        products_menu_pages[menu_page_number]
     ]
     products_keyboard.append([InlineKeyboardButton('<--', callback_data='-1'),
                               InlineKeyboardButton('-->', callback_data='1')])
@@ -116,12 +116,10 @@ def get_location_keyboard_and_text(token, lon, lat):
 def get_delivery_keyboard_and_text(token, query, pizzeria, cart):
     chat_id = query.message.chat_id
 
-    moltin.fill_customer_fields(chat_id, pizzeria['client_lat'], pizzeria['client_lon'], token)
+    moltin.fill_customer_fields(chat_id, pizzeria['customer_lat'], pizzeria['customer_lon'], token)
 
     message = 'Спасибо за выбор нашей пиццы!\n'
     if query.data == 'self':
-        lat = pizzeria['lat']
-        lon = pizzeria['lon']
         self_delivery_message = dedent(f'''
         Ближайшая к вам пиццерия находится по адресу: 
         {pizzeria['address']}\n
@@ -129,7 +127,7 @@ def get_delivery_keyboard_and_text(token, query, pizzeria, cart):
         message += self_delivery_message
         cart['delivery'] = False
 
-    order_message = 'Ваш заказ:\n'
+    order_message = ''
     for product in cart['items']:
         order = dedent(f'''
             Пицца {product['name']}
@@ -137,13 +135,14 @@ def get_delivery_keyboard_and_text(token, query, pizzeria, cart):
             По цене {product['price']} руб - {product['quantity']} шт\n
             ''')
         order_message += order
+
     if query.data == 'delivery':
         cart['delivery'] = True
         if cart['delivery_fee'] > 0:
             order_message += f'Стоимость доставки - {cart["delivery_fee"]} руб\n\n'
             cart['total_amount'] = cart['total_amount'] + cart['delivery_fee']
 
-    message = message + order_message + f'Всего к оплате: {cart["total_amount"]} руб'
+    message = message + 'Ваш заказ\n' + order_message + f'Всего к оплате: {cart["total_amount"]} руб'
     keyboard = [
         [InlineKeyboardButton('Оплата наличными', callback_data='cash')],
         [InlineKeyboardButton('Оплата картой', callback_data='card')]

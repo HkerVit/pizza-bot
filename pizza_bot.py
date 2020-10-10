@@ -188,10 +188,10 @@ def handle_deliveryman(update, context):
             ''')
     query.edit_message_text(message)
 
-    context.bot.send_message(chat_id=pizzeria['deliveryman'], text=cart['delivery_message'])
-    context.bot.send_location(chat_id=pizzeria['deliveryman'],
-                              latitude=pizzeria['client_lat'],
-                              longitude=pizzeria['client_lon'])
+    context.bot.send_message(chat_id=pizzeria['deliveryman-chat-id'], text=cart['delivery_message'])
+    context.bot.send_location(chat_id=pizzeria['deliveryman-chat-id'],
+                              latitude=pizzeria['customer_lat'],
+                              longitude=pizzeria['customer_lon'])
 
     context.job_queue.run_once(delivery_notification, 60, context=query.message.chat_id)
 
@@ -222,8 +222,8 @@ def finish(update, context):
             context.bot.delete_message(chat_id=chat_id, message_id=update.message.message_id)
 
         context.bot.send_location(chat_id=chat_id,
-                                  latitude=pizzeria['lat'],
-                                  longitude=pizzeria['lon'])
+                                  latitude=pizzeria['latitude'],
+                                  longitude=pizzeria['longitude'])
 
     return 'FINISH'
 

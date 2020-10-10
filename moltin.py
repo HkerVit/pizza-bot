@@ -162,22 +162,11 @@ def get_all_entries(token):
         'Authorization': f'Bearer {token}',
     }
 
-    url = 'https://api.moltin.com/v2/flows/pizzeria/entries'
+    url = 'https://api.moltin.com/v2/flows/pizzerias/entries'
     response = requests.get(url, headers=headers)
     response.raise_for_status()
-
-    pizzerias = []
-    for pizzeria in response.json()['data']:
-        pizzerias.append({
-            'id': pizzeria['id'],
-            'address': pizzeria['address'],
-            'alias': pizzeria['alias'],
-            'lon': pizzeria['longitude'],
-            'lat': pizzeria['latitude'],
-            'deliveryman': pizzeria['deliveryman']
-        })
     
-    return pizzerias
+    return response.json()['data']
 
 
 def fill_customer_fields(client_id, lat, lon, token):

@@ -1,24 +1,19 @@
 from geopy import distance
 from textwrap import dedent
+import json
 
 
 def get_closest_pizzeria(lon, lat, pizzerias):
-    user_distances = []
     for pizzeria in pizzerias:
-        pizzeria_coordinate = (float(pizzeria['lat']), float(pizzeria['lon']))
-        user_distances.append({
-            'name': pizzeria['alias'],
-            'address': pizzeria['address'],
-            'lat': float(pizzeria['lat']),
-            'lon': float(pizzeria['lon']),
-            'client_lat': lat,
-            'client_lon': lon,
-            'distance': distance.distance(pizzeria_coordinate, (lat, lon)).km,
-            'deliveryman': pizzeria['deliveryman']
-        })
-    closest_pizzeria = min(user_distances, key=get_user_distance)
+        pizzeria_coordinate = (pizzeria['latitude'], pizzeria['longitude'])
+        pizzeria_distance = distance.distance(pizzeria_coordinate, (lat, lon)).km
+        pizzeria['distance'] = pizzeria_distance
+
+    closest_pizzeria = min(pizzerias, key=get_distance)
+    closest_pizzeria['customer_lon'] = lon
+    closest_pizzeria['customer_lat'] = lat
 
     return closest_pizzeria
 
-def get_user_distance(user_distances):
-    return user_distances['distance']
+def get_distance(pizzerias):
+    return pizzerias['distance']
