@@ -7,22 +7,41 @@ import moltin
 import closest_pizzeria
 
 
-def get_menu_keyboard(products, menu_page_number):
+def get_menu_keyboard(chat_id, products, db, menu_navigation):
     products_menu_pages = list(chunked(products, 6))
-    if menu_page_number < 0:
-        menu_page_number = len(products_menu_pages) - 1
-    if menu_page_number >= len(products_menu_pages):
-        menu_page_number = 0
+    max_menu_pages = len(products_menu_pages) - 1
+    user_keyboard = f'{chat_id}_keyboard'
+
+    if menu_navigation == '/start' or menu_navigation == 'menu':
+        page_number = 0
+        db.set(user_keyboard, page_number)
+    
+    if menu_navigation == 'prev':
+        page_number = int(db.get(user_keyboard))
+        page_number -= 1
+        if page_number < 0:
+            page_number = max_menu_pages
+            db.set(user_keyboard, page_number)
+        else:
+            db.set(user_keyboard, page_number)
+    
+    if menu_navigation == 'next':
+        page_number = int(db.get(user_keyboard))
+        page_number += 1
+        if page_number > max_menu_pages:
+            page_number = 0
+            db.set(user_keyboard, page_number)
+        else:
+            db.set(user_keyboard, page_number)
 
     products_keyboard = [
         [InlineKeyboardButton(product['name'], callback_data=product['id'])] for product in
-        products_menu_pages[menu_page_number]
+        products_menu_pages[page_number]
     ]
-    products_keyboard.append([InlineKeyboardButton('<--', callback_data='-1'),
-                              InlineKeyboardButton('-->', callback_data='1')])
+    products_keyboard.append([InlineKeyboardButton('<--', callback_data='prev'),
+                              InlineKeyboardButton('-->', callback_data='next')])
     products_keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
-    return InlineKeyboardMarkup(products_keyboard), menu_page_number
-
+    return InlineKeyboardMarkup(products_keyboard)
 
 def get_product_keyboard_and_text(products, product_id, token):
     product = next((product for product in products if product['id'] == product_id))
