@@ -23,7 +23,6 @@ yandex_apikey = env('YANDEX_MAP_KEY')
 _database = None
 moltin_token = None
 moltin_token_expires = 0
-menu_page_number = 0
 products = []
 cart = []
 pizzeria = {}
