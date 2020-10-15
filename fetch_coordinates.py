@@ -1,7 +1,5 @@
 import requests
 
-from environs import Env
-
 
 def fetch_coordinates(place, apikey):
     base_url = "https://geocode-maps.yandex.ru/1.x"
