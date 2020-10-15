@@ -21,27 +21,25 @@ def get_menu_keyboard(chat_id, products, db, menu_navigation):
         page_number -= 1
         if page_number < 0:
             page_number = max_menu_pages
-            db.set(user_keyboard, page_number)
-        else:
-            db.set(user_keyboard, page_number)
+        db.set(user_keyboard, page_number)
     
     if menu_navigation == 'next':
         page_number = int(db.get(user_keyboard))
         page_number += 1
         if page_number > max_menu_pages:
             page_number = 0
-            db.set(user_keyboard, page_number)
-        else:
-            db.set(user_keyboard, page_number)
-
+        db.set(user_keyboard, page_number)
+            
     products_keyboard = [
-        [InlineKeyboardButton(product['name'], callback_data=product['id'])] for product in
-        products_menu_pages[page_number]
+        [InlineKeyboardButton(product['name'], callback_data=product['id'])] 
+        for product 
+        in products_menu_pages[page_number]
     ]
     products_keyboard.append([InlineKeyboardButton('<--', callback_data='prev'),
                               InlineKeyboardButton('-->', callback_data='next')])
     products_keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
     return InlineKeyboardMarkup(products_keyboard)
+
 
 def get_product_keyboard_and_text(products, product_id, token):
     product = next((product for product in products if product['id'] == product_id))
@@ -74,14 +72,16 @@ def get_cart_keyboard_and_text(token, chat_id):
             {product['description']}
             По цене {product['price']} руб
 
-            В заказе {product['quantity']} за {product['amount']} руб
-            ''')
-        message += product_output
+            У вас {product['quantity']} за {product['amount']} руб''')
+        message = dedent(f'''{message}
+        {product_output}''')
 
     keyboard.append([InlineKeyboardButton('Меню', callback_data='menu')])
     keyboard.append([InlineKeyboardButton('Выбор доставки', callback_data='delivery_choice')])
     reply_markup = InlineKeyboardMarkup(keyboard)
-    message += f'\nВсего к оплате: {cart["total_amount"]} руб'
+
+    message = dedent(f'''
+    {message}\n\nВсего к оплате: {cart["total_amount"]} руб''')
 
     return reply_markup, message, cart
 
@@ -89,6 +89,8 @@ def get_cart_keyboard_and_text(token, chat_id):
 def get_location_keyboard_and_text(token, lon, lat):
     pizzerias = moltin.get_all_entries(token)
     pizzeria = closest_pizzeria.get_closest_pizzeria(lon, lat, pizzerias)
+    pizzeria['customer_lon'] = lon
+    pizzeria['customer_lat'] = lat
 
     if pizzeria['distance'] > 20:
         distance = int(pizzeria['distance'])
@@ -110,21 +112,22 @@ def get_location_keyboard_and_text(token, lon, lat):
             distance = int(pizzeria['distance'] * 1000)
             message = dedent(f'''
             Может заберёте пиццу из нашей пиццерии неподалеку? 
-            Она всего в {distance} метров от Вас! Вот ее адрес: {pizzeria["address"]}. 
+            Она всего в {distance} метров от Вас! Вот ее адрес: {pizzeria["address"]}.\n
             Но можем доставить и бесплатно! Нам не сложно)''')
             delivery_fee = 0
 
         elif pizzeria['distance'] <= 5:
             message = dedent('''
             Похоже придется ехать до Вас на самокате. 
-            Доставка будет стоить 100 руб. 
+            Доставка будет стоить 100 руб.\n
             Доставляем или самовывоз?''')
             delivery_fee = 100
         else:
             message = dedent(f'''
             Вы довольно далеко от нас. Ближайшая к вам пиццерия
-            находится по адресу: {pizzeria["address"]}. Доставка будет стоить 300 руб.
-            Но Вы можете забрать пиццу самостоятельно)''')
+            находится по адресу: {pizzeria["address"]}.
+            Доставка будет стоить 300 руб.\n
+            Доставляем или самовывоз?''')
             delivery_fee = 300
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -151,17 +154,18 @@ def get_delivery_keyboard_and_text(token, query, pizzeria, cart):
         order = dedent(f'''
             Пицца {product['name']}
             {product['description']}
-            По цене {product['price']} руб - {product['quantity']} шт\n
-            ''')
+            По цене {product['price']} руб - {product['quantity']} шт\n\n''')
         order_message += order
 
     if query.data == 'delivery':
         cart['delivery'] = True
         if cart['delivery_fee'] > 0:
-            order_message += f'Стоимость доставки - {cart["delivery_fee"]} руб\n\n'
+            order_message += f'Стоимость доставки - {cart["delivery_fee"]} руб\n'
             cart['total_amount'] = cart['total_amount'] + cart['delivery_fee']
 
-    message = message + 'Ваш заказ\n' + order_message + f'Всего к оплате: {cart["total_amount"]} руб'
+    message = dedent(f'''{message}Ваш заказ:
+    {order_message}Всего к оплате: {cart["total_amount"]} руб''')
+
     keyboard = [
         [InlineKeyboardButton('Оплата наличными', callback_data='cash')],
         [InlineKeyboardButton('Оплата картой', callback_data='card')]
@@ -170,7 +174,8 @@ def get_delivery_keyboard_and_text(token, query, pizzeria, cart):
 
     delivery_message = dedent(f'''
     Оплачен заказ:
-    {order_message}Итого к оплате {cart["total_amount"]} руб. Доставка по этому адресу:
+    {order_message}Итого к оплате {cart["total_amount"]} руб. 
+    Доставка по этому адресу:
     ''')
 
     cart['delivery_message'] = delivery_message
