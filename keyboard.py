@@ -9,7 +9,7 @@ import closest_pizzeria
 
 def get_menu_keyboard(chat_id, products, db, menu_navigation):
     products_menu_pages = list(chunked(products, 6))
-    max_menu_pages = len(products_menu_pages) - 1
+    max_page_index = len(products_menu_pages) - 1
     user_keyboard = f'{chat_id}_keyboard'
 
     if menu_navigation == '/start' or menu_navigation == 'menu':
@@ -20,13 +20,13 @@ def get_menu_keyboard(chat_id, products, db, menu_navigation):
         page_number = int(db.get(user_keyboard))
         page_number -= 1
         if page_number < 0:
-            page_number = max_menu_pages
+            page_number = max_page_index
         db.set(user_keyboard, page_number)
     
     if menu_navigation == 'next':
         page_number = int(db.get(user_keyboard))
         page_number += 1
-        if page_number > max_menu_pages:
+        if page_number > max_page_index:
             page_number = 0
         db.set(user_keyboard, page_number)
             
@@ -41,7 +41,7 @@ def get_menu_keyboard(chat_id, products, db, menu_navigation):
     return InlineKeyboardMarkup(products_keyboard)
 
 
-def get_product_keyboard_and_text(products, product_id, token):
+def get_product_reply(products, product_id, token):
     product = next((product for product in products if product['id'] == product_id))
     image = moltin.get_image_url(token, product['image_id'])
 
@@ -59,7 +59,7 @@ def get_product_keyboard_and_text(products, product_id, token):
     return reply_markup, message, image
 
 
-def get_cart_keyboard_and_text(token, chat_id):
+def get_cart_reply(token, chat_id):
     cart = moltin.get_cart_items(token, chat_id)
     message = ''
     keyboard = []
@@ -86,8 +86,8 @@ def get_cart_keyboard_and_text(token, chat_id):
     return reply_markup, message, cart
 
 
-def get_location_keyboard_and_text(token, lon, lat):
-    pizzerias = moltin.get_all_entries(token)
+def get_location_reply(token, lon, lat):
+    pizzerias = moltin.get_all_pizzerias(token)
     pizzeria = closest_pizzeria.get_closest_pizzeria(lon, lat, pizzerias)
     pizzeria['customer_lon'] = lon
     pizzeria['customer_lat'] = lat
@@ -109,10 +109,11 @@ def get_location_keyboard_and_text(token, lon, lat):
             [InlineKeyboardButton('Доставка', callback_data='delivery')]
         ]
         if pizzeria['distance'] <= 0.5:
-            distance = int(pizzeria['distance'] * 1000)
+            meter_in_km = 1000
+            distance_in_meter = int(pizzeria['distance'] * meter_in_km)
             message = dedent(f'''
             Может заберёте пиццу из нашей пиццерии неподалеку? 
-            Она всего в {distance} метров от Вас! Вот ее адрес: {pizzeria["address"]}.\n
+            Она всего в {distance_in_meter} метров от Вас! Вот ее адрес: {pizzeria["address"]}.\n
             Но можем доставить и бесплатно! Нам не сложно)''')
             delivery_fee = 0
 
@@ -135,7 +136,7 @@ def get_location_keyboard_and_text(token, lon, lat):
     return reply_markup, message, pizzeria, delivery_fee
 
 
-def get_delivery_keyboard_and_text(token, query, pizzeria, cart):
+def get_delivery_reply(token, query, pizzeria, cart):
     chat_id = query.message.chat_id
 
     moltin.fill_customer_fields(chat_id, pizzeria['customer_lat'], pizzeria['customer_lon'], token)
