@@ -1,6 +1,7 @@
 import requests
 import json
 
+
 # It is managing of the product in the moltin shop
 def get_products_list(token):
     headers = {
@@ -64,6 +65,7 @@ def get_image_url(token, image_id):
 
     return image['data']['link']['href']
 
+
 # It is managing of the cart in the moltin shop
 def add_product_to_cart(product_id, token, quantity, chat_id):
     product_data = {
@@ -114,7 +116,7 @@ def get_cart_items(token, chat_id):
     return {'items': items, 'total_amount': total_amount}
 
 
-def remove_cart_items(token, chat_id, product_id):
+def remove_cart_item(token, chat_id, product_id):
     headers = {
         'Authorization': f'Bearer {token}',
     }
@@ -122,6 +124,7 @@ def remove_cart_items(token, chat_id, product_id):
 
     response = requests.delete(url, headers=headers)
     response.raise_for_status()
+
 
 # It is managing of the user in the moltin shop
 def create_customer(token, username, email, password):
@@ -157,7 +160,7 @@ def get_customer(token, customer_id):
     return response.json()
 
 
-def get_all_entries(token):
+def get_all_pizzerias(token):
     headers = {
         'Authorization': f'Bearer {token}',
     }
