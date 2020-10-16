@@ -35,15 +35,15 @@ def start(update, context):
 
     if query:
         chat_id = query.message.chat_id
-        menu_navigation = query.data
+        menu_button = query.data
     else:
-        menu_navigation = update.message.text
+        menu_button = update.message.text
         chat_id = update.message.chat_id
 
     if time.time() >= moltin_token_expires or len(products) == 0:
         products = moltin.get_products_list(token=moltin_token)
 
-    reply_markup = keyboard.get_menu_keyboard(chat_id, products, menu_navigation)
+    reply_markup = keyboard.get_menu_keyboard(chat_id, products, menu_button)
     context.bot.send_message(chat_id=chat_id, text='Пожалуйста, выберите пиццу:',
                              reply_markup=reply_markup)
     if query:

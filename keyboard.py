@@ -7,31 +7,49 @@ import moltin
 import closest_pizzeria
 
 
-def get_menu_keyboard(chat_id, products, menu_navigation):
+def get_menu_keyboard(chat_id, products, menu_button):
     products_menu_pages = list(chunked(products, 6))
-    max_page_index = len(products_menu_pages) - 1
+    max_page_index = len(products_menu_pages)
 
-    if menu_navigation == '/start' or menu_navigation == 'menu':
-        page_number = 0
+    if menu_button == '/start' or menu_button == 'menu':
+        page_number = 1
     else:
-        page_number = int(menu_navigation.split(',')[1])
+        page_number = int(menu_button.split(',')[1])
     
-    prev_page = page_number - 1
-    next_page = page_number + 1
-    if prev_page < 0:
-        prev_page = max_page_index
-    elif next_page > max_page_index:
-        next_page = 0
-            
     products_keyboard = [
-        [InlineKeyboardButton(product['name'], callback_data=product['id'])] 
-        for product 
-        in products_menu_pages[page_number]
-    ]
-    products_keyboard.append([InlineKeyboardButton('<--', callback_data=f'prev,{prev_page}'),
-                              InlineKeyboardButton('-->', callback_data=f'next,{next_page}')])
-    products_keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
-    return InlineKeyboardMarkup(products_keyboard)
+            [InlineKeyboardButton(product['name'], callback_data=product['id'])] 
+            for product 
+            in products_menu_pages[(page_number - 1)]
+        ]
+
+    if page_number == 1:
+        next_page = page_number + 1
+
+        products_keyboard.append([
+            InlineKeyboardButton(f'стр {next_page} ->', callback_data=f'next,{next_page}')
+            ])
+        products_keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
+        return InlineKeyboardMarkup(products_keyboard)
+
+    elif page_number == max_page_index:
+        previous_page = page_number - 1
+
+        products_keyboard.append([
+            InlineKeyboardButton(f'<- стр {previous_page}', callback_data=f'prev,{previous_page}')
+            ])
+        products_keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
+        return InlineKeyboardMarkup(products_keyboard)
+
+    else:
+        next_page = page_number + 1
+        previous_page = page_number - 1
+
+        products_keyboard.append([
+            InlineKeyboardButton(f'<- стр {previous_page}', callback_data=f'prev,{previous_page}'), 
+            InlineKeyboardButton(f'стр {next_page} ->', callback_data=f'prev,{next_page}')
+            ])
+        products_keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
+        return InlineKeyboardMarkup(products_keyboard)
 
 
 def get_product_reply(products, product_id, token):
