@@ -7,36 +7,29 @@ import moltin
 import closest_pizzeria
 
 
-def get_menu_keyboard(chat_id, products, db, menu_navigation):
+def get_menu_keyboard(chat_id, products, menu_navigation):
     products_menu_pages = list(chunked(products, 6))
     max_page_index = len(products_menu_pages) - 1
-    user_keyboard = f'{chat_id}_keyboard'
 
     if menu_navigation == '/start' or menu_navigation == 'menu':
         page_number = 0
-        db.set(user_keyboard, page_number)
+    else:
+        page_number = int(menu_navigation.split(',')[1])
     
-    if menu_navigation == 'prev':
-        page_number = int(db.get(user_keyboard))
-        page_number -= 1
-        if page_number < 0:
-            page_number = max_page_index
-        db.set(user_keyboard, page_number)
-    
-    if menu_navigation == 'next':
-        page_number = int(db.get(user_keyboard))
-        page_number += 1
-        if page_number > max_page_index:
-            page_number = 0
-        db.set(user_keyboard, page_number)
+    prev_page = page_number - 1
+    next_page = page_number + 1
+    if prev_page < 0:
+        prev_page = max_page_index
+    elif next_page > max_page_index:
+        next_page = 0
             
     products_keyboard = [
         [InlineKeyboardButton(product['name'], callback_data=product['id'])] 
         for product 
         in products_menu_pages[page_number]
     ]
-    products_keyboard.append([InlineKeyboardButton('<--', callback_data='prev'),
-                              InlineKeyboardButton('-->', callback_data='next')])
+    products_keyboard.append([InlineKeyboardButton('<--', callback_data=f'prev,{prev_page}'),
+                              InlineKeyboardButton('-->', callback_data=f'next,{next_page}')])
     products_keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
     return InlineKeyboardMarkup(products_keyboard)
 

@@ -30,7 +30,6 @@ users_pizzerias = {}
 
 def start(update, context):
     global products
-    db = get_database_connection()
     check_access_token()
     query = update.callback_query
 
@@ -44,7 +43,7 @@ def start(update, context):
     if time.time() >= moltin_token_expires or len(products) == 0:
         products = moltin.get_products_list(token=moltin_token)
 
-    reply_markup = keyboard.get_menu_keyboard(chat_id, products, db, menu_navigation)
+    reply_markup = keyboard.get_menu_keyboard(chat_id, products, menu_navigation)
     context.bot.send_message(chat_id=chat_id, text='Пожалуйста, выберите пиццу:',
                              reply_markup=reply_markup)
     if query:
@@ -262,7 +261,7 @@ def handle_users_reply(update, context):
 
     if user_reply == '/start' or user_reply == 'menu':
         user_state = 'START'
-    elif user_reply == 'prev' or user_reply == 'next':
+    elif 'prev' in user_reply or 'next' in user_reply:
         user_state = 'START'
     elif user_reply == 'cart':
         user_state = 'HANDLE_CART'
