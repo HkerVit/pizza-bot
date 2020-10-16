@@ -24,8 +24,8 @@ _database = None
 moltin_token = None
 moltin_token_expires = 0
 products = []
-cart = []
-pizzeria = {}
+users_carts = {}
+users_pizzerias = {}
 
 
 def start(update, context):
@@ -60,7 +60,7 @@ def handle_menu(update, context):
     chat_id = query.message.chat_id
 
     product_id = query.data
-    reply_markup, message, image = keyboard.get_product_keyboard_and_text(products, product_id, moltin_token)
+    reply_markup, message, image = keyboard.get_product_reply(products, product_id, moltin_token)
 
     context.bot.send_photo(chat_id=chat_id, photo=image,
                            caption=message, reply_markup=reply_markup)
@@ -87,7 +87,7 @@ def handle_description(update, context):
 
 
 def handle_cart(update, context):
-    global cart
+    global users_carts
     check_access_token()
     query = update.callback_query
     chat_id = query.message.chat_id
@@ -98,7 +98,8 @@ def handle_cart(update, context):
                                  product_id=product_id,
                                  chat_id=chat_id)
 
-    reply_markup, message, cart = keyboard.get_cart_keyboard_and_text(moltin_token, chat_id)
+    reply_markup, message, cart = keyboard.get_cart_reply(moltin_token, chat_id)
+    users_carts[chat_id] = cart
 
     query.edit_message_text(text=message, reply_markup=reply_markup)
 
@@ -113,7 +114,7 @@ def handle_waiting(update, context):
 
 
 def handle_location(update, context):
-    global pizzeria
+    global users_pizzerias
     check_access_token()
     chat_id = update.message.chat_id
 
@@ -129,20 +130,25 @@ def handle_location(update, context):
         lat = update.message.location.latitude
         lon = update.message.location.longitude
 
-    reply_markup, message, pizzeria, delivery_fee = keyboard.get_location_keyboard_and_text(moltin_token, lon, lat)
+    reply_markup, message, pizzeria, delivery_fee = keyboard.get_location_reply(moltin_token, lon, lat)
     update.message.reply_text(message, reply_markup=reply_markup)
-    cart['delivery_fee'] = delivery_fee
+    users_carts[chat_id]['delivery_fee'] = delivery_fee
+    users_pizzerias[chat_id] = pizzeria
 
     return 'HANDLE_DELIVERY'
 
 
 def handle_delivery(update, context):
-    global cart
+    global users_carts
     check_access_token()
     query = update.callback_query
-
-    reply_markup, customer_message, cart = keyboard.get_delivery_keyboard_and_text(moltin_token, query, pizzeria, cart)
+    chat_id = query.message.chat_id
+    
+    cart = users_carts[chat_id]
+    pizzeria = users_pizzerias[chat_id]
+    reply_markup, customer_message, cart = keyboard.get_delivery_reply(moltin_token, query, pizzeria, cart)
     query.edit_message_text(customer_message, reply_markup=reply_markup)
+    users_carts[chat_id] = cart
 
     return 'HANDLE_PAYMENT'
 
@@ -151,6 +157,7 @@ def handle_payment(update, context):
     query = update.callback_query
     chat_id = query.message.chat_id
 
+    cart = users_carts[chat_id]
     if query.data == 'cash':
         keyboard = [[InlineKeyboardButton(f'Подтверждаю', callback_data='cash_confirm')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -179,12 +186,16 @@ def handle_payment(update, context):
 
 def handle_deliveryman(update, context):
     query = update.callback_query
+    chat_id = query.message.chat_id
+
     message = dedent(f'''
             Cпасибо за выбор нашей пиццы!
             Курьер пиццу доставит в течении часа.
             ''')
     query.edit_message_text(message)
 
+    cart = users_carts[chat_id]
+    pizzeria = users_pizzerias[chat_id]
     context.bot.send_message(chat_id=pizzeria['deliveryman-chat-id'], text=cart['delivery_message'])
     context.bot.send_location(chat_id=pizzeria['deliveryman-chat-id'],
                               latitude=pizzeria['customer_lat'],
@@ -205,6 +216,8 @@ def finish(update, context):
     else:
         chat_id = update.message.chat_id
 
+    cart = users_carts[chat_id]
+    pizzeria = users_pizzerias[chat_id]
     if not cart['delivery']:
         message = dedent(f'''
            Cпасибо за выбор нашей пиццы!\n
@@ -225,7 +238,7 @@ def finish(update, context):
     return 'FINISH'
 
 
-def delivery_notification(context):
+def delivery_notification(update, context):
     message = dedent(f'''
     Приятного аппетита! *место для рекламы*\n
     *сообщение что делать если пицца не пришла*
