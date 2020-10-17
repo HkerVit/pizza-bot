@@ -237,7 +237,7 @@ def finish(update, context):
     return 'FINISH'
 
 
-def delivery_notification(update, context):
+def delivery_notification(context):
     message = dedent(f'''
     Приятного аппетита! *место для рекламы*\n
     *сообщение что делать если пицца не пришла*
