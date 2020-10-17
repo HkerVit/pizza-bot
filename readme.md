@@ -1,6 +1,6 @@
 # Pizza telegram bot
 
-A Telegram bot provides access to the pizza-shop. You can choose a pizza what you want, get a descriptions of chosen pizza with the picture, add the pizza to the cart, remove from the cart, and send a request for the payment. This bot use the api of [Elasticpath](https://www.elasticpath.com/) service (before it called Moltin).
+The Telegram bot provides access to the pizza-shop. You can choose a pizza what you want, get a descriptions of chosen pizza with the picture, add the pizza to the cart, remove from the cart, and send the request for the payment. This bot use the api of [Elasticpath](https://www.elasticpath.com/) service (before this service was called Molton).
 
 All CRUD methods worked by API [documentation.elasticpath](https://documentation.elasticpath.com/commerce-cloud/docs/api/index.html).
 
@@ -44,7 +44,7 @@ Declare default environment variables in `.env` file:
 
 ## How To Use
 
-Before run it recommends to install virtual environment:
+Before run it recommended to install virtual environment:
 
 ```bash
 python3 -m venv env
@@ -81,6 +81,7 @@ Python scripts files:
 |fetch_coordinates.py|Interaction with Yandex map API and get geo location (latitude, longitude)from text message|
 |closest_pizzeria.py|Script calculates closest pizzeria to customer location|
 |payment.py|Interact with Payment service and payment processing|
+---
 
 ## License
 
