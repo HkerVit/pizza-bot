@@ -93,7 +93,7 @@ def handle_cart(update, context):
 
     if 'remove' in query.data:
         product_id = query.data.split(',')[1]
-        moltin.remove_cart_items(token=moltin_token,
+        moltin.remove_cart_item(token=moltin_token,
                                  product_id=product_id,
                                  chat_id=chat_id)
 
