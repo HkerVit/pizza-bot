@@ -9,7 +9,7 @@ from telegram.ext import Filters, PreCheckoutQueryHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from environs import Env
 
-from moltin_token import get_access_token
+from moltin_token import get_token
 from fetch_coordinates import fetch_coordinates
 import moltin
 import keyboard
@@ -22,7 +22,7 @@ yandex_apikey = env('YANDEX_MAP_KEY')
 
 _database = None
 moltin_token = None
-moltin_token_expires = 0
+moltin_token_time = 0
 products = []
 users_carts = {}
 users_pizzerias = {}
@@ -30,7 +30,10 @@ users_pizzerias = {}
 
 def start(update, context):
     global products
-    check_access_token()
+    global moltin_token
+    global moltin_token_time
+    moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
+
     query = update.callback_query
 
     if query:
@@ -40,7 +43,7 @@ def start(update, context):
         menu_button = update.message.text
         chat_id = update.message.chat_id
 
-    if time.time() >= moltin_token_expires or len(products) == 0:
+    if time.time() >= moltin_token_time or len(products) == 0:
         products = moltin.get_products_list(token=moltin_token)
 
     reply_markup = keyboard.get_menu_keyboard(chat_id, products, menu_button)
@@ -54,7 +57,10 @@ def start(update, context):
 
 
 def handle_menu(update, context):
-    check_access_token()
+    global moltin_token
+    global moltin_token_time
+    moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
+
     query = update.callback_query
     chat_id = query.message.chat_id
 
@@ -69,7 +75,10 @@ def handle_menu(update, context):
 
 
 def handle_description(update, context):
-    check_access_token()
+    global moltin_token
+    global moltin_token_time
+    moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
+
     query = update.callback_query
     chat_id = query.message.chat_id
     product_id = query.data
@@ -87,7 +96,10 @@ def handle_description(update, context):
 
 def handle_cart(update, context):
     global users_carts
-    check_access_token()
+    global moltin_token
+    global moltin_token_time
+    moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
+
     query = update.callback_query
     chat_id = query.message.chat_id
 
@@ -114,7 +126,10 @@ def handle_waiting(update, context):
 
 def handle_location(update, context):
     global users_pizzerias
-    check_access_token()
+    global moltin_token
+    global moltin_token_time
+    moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
+
     chat_id = update.message.chat_id
 
     if update.message.text:
@@ -139,7 +154,10 @@ def handle_location(update, context):
 
 def handle_delivery(update, context):
     global users_carts
-    check_access_token()
+    global moltin_token
+    global moltin_token_time
+    moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
+
     query = update.callback_query
     chat_id = query.message.chat_id
     
@@ -304,15 +322,6 @@ def get_database_connection():
                                 port=database_port,
                                 password=database_password)
     return _database
-
-
-def check_access_token():
-    global moltin_token
-    global moltin_token_expires
-    curent_time = time.time()
-
-    if curent_time >= moltin_token_expires:
-        moltin_token, moltin_token_expires = get_access_token()
 
 
 if __name__ == '__main__':
