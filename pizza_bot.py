@@ -43,9 +43,9 @@ def start(update, context):
 
     products = moltin.get_products_list(moltin_token, moltin_token_time, products)
     reply_markup = keyboard.get_menu_keyboard(chat_id, products, menu_button)
-    
+
     if reply_markup is None:
-        message = 'Для того, чтобы начать наберите отправьте боту /start'
+        message = 'Для того, чтобы начать отправьте боту /start'
         context.bot.send_message(chat_id=chat_id, text=message)
         return 'START'
 
