@@ -1,29 +1,32 @@
 import requests
 import json
+import time
 
 
 # It is managing of the product in the moltin shop
-def get_products_list(token):
-    headers = {
-        'Authorization': f'Bearer {token}',
-        'Content-Type': 'application/json',
-    }
+def get_products_list(token, token_time, products):
+    current_time = time.time()
+    if len(products) == 0 or current_time >= token_time:
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+        }
 
-    url = 'https://api.moltin.com/v2/products/'
+        url = 'https://api.moltin.com/v2/products/'
 
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    products_response = response.json()
-    
-    products = []
-    for product in products_response['data']:
-        products.append({
-                'name': product['name'],
-                'id': product['id'],
-                'description': product['description'],
-                'price': product['meta']['display_price']['with_tax']['formatted'],
-                'image_id': product['relationships']['main_image']['data']['id']
-            })
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        products_response = response.json()
+        
+        products = []
+        for product in products_response['data']:
+            products.append({
+                    'name': product['name'],
+                    'id': product['id'],
+                    'description': product['description'],
+                    'price': product['meta']['display_price']['with_tax']['formatted'],
+                    'image_id': product['relationships']['main_image']['data']['id']
+                })
 
     return products
 
@@ -133,7 +136,7 @@ def remove_all_cart_items(token, chat_id):
     url = f'https://api.moltin.com/v2/carts/{chat_id}'
     response = requests.delete(url, headers=headers)
     response.raise_for_status()
-    
+
 
 # It is managing of the user in the moltin shop
 def create_customer(token, username, email, password):
