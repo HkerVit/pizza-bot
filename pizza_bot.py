@@ -24,7 +24,6 @@ _database = None
 moltin_token = None
 moltin_token_time = 0
 products = []
-users_pizzerias = {}
 
 
 def start(update, context):
@@ -44,6 +43,11 @@ def start(update, context):
 
     products = moltin.get_products_list(moltin_token, moltin_token_time, products)
     reply_markup = keyboard.get_menu_keyboard(chat_id, products, menu_button)
+    
+    if reply_markup is None:
+        message = 'Для того, чтобы начать наберите отправьте боту /start'
+        context.bot.send_message(chat_id=chat_id, text=message)
+        return 'START'
 
     context.bot.send_message(chat_id=chat_id, text='Пожалуйста, выберите пиццу:',
                              reply_markup=reply_markup)
@@ -149,7 +153,7 @@ def handle_location(update, context):
     cart = json.loads(db.get(user_cart))
     cart['delivery_fee'] = delivery_fee
     db.set(user_cart, json.dumps(cart))
-    users_pizzerias[chat_id] = pizzeria
+    db.set(user_pizzeria, json.dumps(pizzeria))
 
     return 'HANDLE_DELIVERY'
 
@@ -163,9 +167,11 @@ def handle_delivery(update, context):
     query = update.callback_query
     chat_id = query.message.chat_id
     user_cart = f'{chat_id}_cart'
-    
+    user_pizzeria = f'{chat_id}_pizzeria'
+
     cart = json.loads(db.get(user_cart))
-    pizzeria = users_pizzerias[chat_id]
+    pizzeria = json.loads(db.get(user_pizzeria))
+
     reply_markup, customer_message, cart = keyboard.get_delivery_reply(moltin_token, query, pizzeria, cart)
     query.edit_message_text(customer_message, reply_markup=reply_markup)
     db.set(user_cart, json.dumps(cart))
@@ -211,6 +217,7 @@ def handle_deliveryman(update, context):
     chat_id = query.message.chat_id
     db = get_database_connection()
     user_cart = f'{chat_id}_cart'
+    user_pizzeria = f'{chat_id}_pizzeria'
 
     message = dedent(f'''
             Cпасибо за выбор нашей пиццы!
@@ -218,8 +225,9 @@ def handle_deliveryman(update, context):
             ''')
     query.edit_message_text(message)
 
+    pizzeria = json.loads(db.get(user_pizzeria))
     cart = json.loads(db.get(user_cart))
-    pizzeria = users_pizzerias[chat_id]
+
     context.bot.send_message(chat_id=pizzeria['deliveryman-chat-id'], text=cart['delivery_message'])
     context.bot.send_location(chat_id=pizzeria['deliveryman-chat-id'],
                               latitude=pizzeria['customer_lat'],
@@ -244,9 +252,10 @@ def finish(update, context):
     else:
         chat_id = update.message.chat_id
     user_cart = f'{chat_id}_cart'
+    user_pizzeria = f'{chat_id}_pizzeria'
 
     cart = json.loads(db.get(user_cart))
-    pizzeria = users_pizzerias[chat_id]
+    pizzeria = json.loads(db.get(user_pizzeria))
     if not cart['delivery']:
         message = dedent(f'''
            Cпасибо за выбор нашей пиццы!\n
@@ -265,7 +274,7 @@ def finish(update, context):
                                   longitude=pizzeria['longitude'])
 
     moltin.remove_all_cart_items(moltin_token, chat_id)
-    return 'FINISH'
+    return 'START'
 
 
 def delivery_notification(context):
