@@ -1,6 +1,6 @@
 import logging
 from textwrap import dedent
-import time
+import json
 
 import redis
 from telegram.ext import Updater
@@ -24,7 +24,6 @@ _database = None
 moltin_token = None
 moltin_token_time = 0
 products = []
-users_carts = {}
 users_pizzerias = {}
 
 
@@ -43,10 +42,9 @@ def start(update, context):
         menu_button = update.message.text
         chat_id = update.message.chat_id
 
-    if time.time() >= moltin_token_time or len(products) == 0:
-        products = moltin.get_products_list(token=moltin_token)
-
+    products = moltin.get_products_list(moltin_token, moltin_token_time, products)
     reply_markup = keyboard.get_menu_keyboard(chat_id, products, menu_button)
+
     context.bot.send_message(chat_id=chat_id, text='Пожалуйста, выберите пиццу:',
                              reply_markup=reply_markup)
     if query:
@@ -88,20 +86,20 @@ def handle_description(update, context):
                                product_id=product['id'],
                                quantity=1,
                                chat_id=chat_id)
-    message = f'Добавлена {product["name"]} в корзину'
+    message = f'{product["name"]} добавлена в корзину'
     context.bot.answer_callback_query(callback_query_id=query.id, text=message)
 
     return 'HANDLE_DESCRIPTION'
 
 
 def handle_cart(update, context):
-    global users_carts
     global moltin_token
     global moltin_token_time
     moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
-
+    db = get_database_connection()
     query = update.callback_query
     chat_id = query.message.chat_id
+    user_cart = f'{chat_id}_cart'
 
     if 'remove' in query.data:
         product_id = query.data.split(',')[1]
@@ -110,8 +108,7 @@ def handle_cart(update, context):
                                  chat_id=chat_id)
 
     reply_markup, message, cart = keyboard.get_cart_reply(moltin_token, chat_id)
-    users_carts[chat_id] = cart
-
+    db.set(user_cart, json.dumps(cart))
     query.edit_message_text(text=message, reply_markup=reply_markup)
 
     return 'HANDLE_CART'
@@ -129,8 +126,10 @@ def handle_location(update, context):
     global moltin_token
     global moltin_token_time
     moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
-
+    db = get_database_connection()
     chat_id = update.message.chat_id
+    user_cart = f'{chat_id}_cart'
+    user_pizzeria = f'{chat_id}_pizzeria'
 
     if update.message.text:
         try:
@@ -146,26 +145,30 @@ def handle_location(update, context):
 
     reply_markup, message, pizzeria, delivery_fee = keyboard.get_location_reply(moltin_token, lon, lat)
     update.message.reply_text(message, reply_markup=reply_markup)
-    users_carts[chat_id]['delivery_fee'] = delivery_fee
+
+    cart = json.loads(db.get(user_cart))
+    cart['delivery_fee'] = delivery_fee
+    db.set(user_cart, json.dumps(cart))
     users_pizzerias[chat_id] = pizzeria
 
     return 'HANDLE_DELIVERY'
 
 
 def handle_delivery(update, context):
-    global users_carts
     global moltin_token
     global moltin_token_time
     moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
+    db = get_database_connection()
 
     query = update.callback_query
     chat_id = query.message.chat_id
+    user_cart = f'{chat_id}_cart'
     
-    cart = users_carts[chat_id]
+    cart = json.loads(db.get(user_cart))
     pizzeria = users_pizzerias[chat_id]
     reply_markup, customer_message, cart = keyboard.get_delivery_reply(moltin_token, query, pizzeria, cart)
     query.edit_message_text(customer_message, reply_markup=reply_markup)
-    users_carts[chat_id] = cart
+    db.set(user_cart, json.dumps(cart))
 
     return 'HANDLE_PAYMENT'
 
@@ -173,8 +176,10 @@ def handle_delivery(update, context):
 def handle_payment(update, context):
     query = update.callback_query
     chat_id = query.message.chat_id
+    db = get_database_connection()
+    user_cart = f'{chat_id}_cart'
 
-    cart = users_carts[chat_id]
+    cart = json.loads(db.get(user_cart))
     if query.data == 'cash':
         keyboard = [[InlineKeyboardButton(f'Подтверждаю', callback_data='cash_confirm')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -204,6 +209,8 @@ def handle_payment(update, context):
 def handle_deliveryman(update, context):
     query = update.callback_query
     chat_id = query.message.chat_id
+    db = get_database_connection()
+    user_cart = f'{chat_id}_cart'
 
     message = dedent(f'''
             Cпасибо за выбор нашей пиццы!
@@ -211,7 +218,7 @@ def handle_deliveryman(update, context):
             ''')
     query.edit_message_text(message)
 
-    cart = users_carts[chat_id]
+    cart = json.loads(db.get(user_cart))
     pizzeria = users_pizzerias[chat_id]
     context.bot.send_message(chat_id=pizzeria['deliveryman-chat-id'], text=cart['delivery_message'])
     context.bot.send_location(chat_id=pizzeria['deliveryman-chat-id'],
@@ -224,7 +231,11 @@ def handle_deliveryman(update, context):
 
 
 def finish(update, context):
+    global moltin_token
+    global moltin_token_time
+    moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
     query = update.callback_query
+    db = get_database_connection()
 
     if query:
         chat_id = query.message.chat_id
@@ -232,8 +243,9 @@ def finish(update, context):
             query.edit_message_text('Очень жаль, что не удалось Вам помочь')
     else:
         chat_id = update.message.chat_id
+    user_cart = f'{chat_id}_cart'
 
-    cart = users_carts[chat_id]
+    cart = json.loads(db.get(user_cart))
     pizzeria = users_pizzerias[chat_id]
     if not cart['delivery']:
         message = dedent(f'''
@@ -252,6 +264,7 @@ def finish(update, context):
                                   latitude=pizzeria['latitude'],
                                   longitude=pizzeria['longitude'])
 
+    moltin.remove_all_cart_items(moltin_token, chat_id)
     return 'FINISH'
 
 
