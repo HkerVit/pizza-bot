@@ -126,6 +126,15 @@ def remove_cart_item(token, chat_id, product_id):
     response.raise_for_status()
 
 
+def remove_all_cart_items(token, chat_id):
+    headers = {
+        'Authorization': f'Bearer {token}',
+    }
+    url = f'https://api.moltin.com/v2/carts/{chat_id}'
+    response = requests.delete(url, headers=headers)
+    response.raise_for_status()
+    
+
 # It is managing of the user in the moltin shop
 def create_customer(token, username, email, password):
     headers = {
