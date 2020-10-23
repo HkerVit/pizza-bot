@@ -14,8 +14,11 @@ def get_menu_keyboard(chat_id, products, menu_button):
     if menu_button == '/start' or menu_button == 'menu':
         page_number = 1
     else:
-        __, page_number = menu_button.split(',')
-        page_number = int(page_number)
+        try:
+            __, page_number = menu_button.split(',')
+            page_number = int(page_number)
+        except ValueError:
+            return None
     
     products_keyboard = [
             [InlineKeyboardButton(product['name'], callback_data=product['id'])] 
