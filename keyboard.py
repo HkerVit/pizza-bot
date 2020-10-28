@@ -1,4 +1,5 @@
 from textwrap import dedent
+import json
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from more_itertools import chunked
@@ -46,7 +47,8 @@ def get_menu_keyboard(chat_id, products, menu_button):
     return InlineKeyboardMarkup(products_keyboard)
 
 
-def get_product_reply(products, product_id, token):
+def get_product_reply(db, product_id, token):
+    products = json.loads(db.get('products'))
     product = next((product for product in products if product['id'] == product_id))
     image = moltin.get_image_url(token, product['image_id'])
 

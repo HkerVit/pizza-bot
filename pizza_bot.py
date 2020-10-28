@@ -23,15 +23,13 @@ yandex_apikey = env('YANDEX_MAP_KEY')
 _database = None
 moltin_token = None
 moltin_token_time = 0
-products = []
 
 
 def start(update, context):
-    global products
     global moltin_token
     global moltin_token_time
     moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
-
+    db = get_database_connection()
     query = update.callback_query
 
     if query:
@@ -40,8 +38,9 @@ def start(update, context):
     else:
         menu_button = update.message.text
         chat_id = update.message.chat_id
-
-    products = moltin.get_products_list(moltin_token, moltin_token_time, products)
+    
+    products = moltin.get_products_list(moltin_token, moltin_token_time)
+    db.set('products', json.dumps(products))
     reply_markup = keyboard.get_menu_keyboard(chat_id, products, menu_button)
 
     if reply_markup is None:
@@ -62,12 +61,13 @@ def handle_menu(update, context):
     global moltin_token
     global moltin_token_time
     moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
+    db = get_database_connection()
 
     query = update.callback_query
     chat_id = query.message.chat_id
 
     product_id = query.data
-    reply_markup, message, image = keyboard.get_product_reply(products, product_id, moltin_token)
+    reply_markup, message, image = keyboard.get_product_reply(db, product_id, moltin_token)
 
     context.bot.send_photo(chat_id=chat_id, photo=image,
                            caption=message, reply_markup=reply_markup)
@@ -80,11 +80,13 @@ def handle_description(update, context):
     global moltin_token
     global moltin_token_time
     moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
+    db = get_database_connection()
 
     query = update.callback_query
     chat_id = query.message.chat_id
     product_id = query.data
-
+    products = json.loads(db.get('products'))
+    
     product = next((product for product in products if product['id'] == product_id))
     moltin.add_product_to_cart(token=moltin_token,
                                product_id=product['id'],
