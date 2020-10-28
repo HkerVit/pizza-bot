@@ -23,37 +23,27 @@ def get_menu_keyboard(chat_id, products, menu_button):
     products_keyboard = [
             [InlineKeyboardButton(product['name'], callback_data=product['id'])] 
             for product 
-            in products_menu_pages[(page_number - 1)]
+            in products_menu_pages[page_number - 1]
         ]
 
     if page_number == 1:
-        next_page = page_number + 1
-
         products_keyboard.append([
-            InlineKeyboardButton(f'стр {next_page} ->', callback_data=f'next,{next_page}')
+            InlineKeyboardButton(f'стр {page_number + 1} ->', callback_data=f'next,{page_number + 1}')
             ])
-        products_keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
-        return InlineKeyboardMarkup(products_keyboard)
 
     elif page_number == max_page_index:
-        previous_page = page_number - 1
-
         products_keyboard.append([
-            InlineKeyboardButton(f'<- стр {previous_page}', callback_data=f'prev,{previous_page}')
+            InlineKeyboardButton(f'<- стр {page_number - 1}', callback_data=f'prev,{page_number - 1}')
             ])
-        products_keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
-        return InlineKeyboardMarkup(products_keyboard)
 
     else:
-        next_page = page_number + 1
-        previous_page = page_number - 1
-
         products_keyboard.append([
-            InlineKeyboardButton(f'<- стр {previous_page}', callback_data=f'prev,{previous_page}'), 
-            InlineKeyboardButton(f'стр {next_page} ->', callback_data=f'prev,{next_page}')
+            InlineKeyboardButton(f'<- стр {page_number - 1}', callback_data=f'prev,{page_number - 1}'), 
+            InlineKeyboardButton(f'стр {page_number + 1} ->', callback_data=f'prev,{page_number + 1}')
             ])
-        products_keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
-        return InlineKeyboardMarkup(products_keyboard)
+    
+    products_keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
+    return InlineKeyboardMarkup(products_keyboard)
 
 
 def get_product_reply(products, product_id, token):
