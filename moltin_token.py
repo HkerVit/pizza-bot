@@ -11,19 +11,19 @@ client_secret = env('MOLTIN_CLIENT_SECRET_TOKEN')
 
 def get_token(token, token_time):
     current_time = time.time()
-    if token is None or current_time >= token_time:
-        data = {
-            'client_id': client_id,
-            'client_secret': client_secret,
-            'grant_type': 'client_credentials'
-        }
 
-        url = 'https://api.moltin.com/oauth/access_token'
-
-        response = requests.post(url, data=data)
-        response.raise_for_status()
-        access_response = response.json()
-        return access_response['access_token'], access_response['expires']
-    else:
+    if token and current_time <= token_time:
         return token, token_time
+   
+    data = {
+        'client_id': client_id,
+        'client_secret': client_secret,
+        'grant_type': 'client_credentials'
+    }
 
+    url = 'https://api.moltin.com/oauth/access_token'
+
+    response = requests.post(url, data=data)
+    response.raise_for_status()
+    access_response = response.json()
+    return access_response['access_token'], access_response['expires']
