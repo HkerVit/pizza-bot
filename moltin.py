@@ -3,7 +3,7 @@ import json
 
 
 # It is managing of the product in the moltin shop
-def get_products_list(token, token_time):
+def get_products_list(token):
     headers = {
         'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json',
