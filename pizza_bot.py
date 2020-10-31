@@ -205,7 +205,7 @@ def handle_deliveryman(update, context, db, token):
                               latitude=pizzeria['customer_lat'],
                               longitude=pizzeria['customer_lon'])
 
-    context.job_queue.run_once(delivery_notification, 60, context=query.message.chat_id)
+    context.job_queue.run_once(get_delivery_notification, 60, context=query.message.chat_id)
 
     return 'HANDLE_DELIVERYMAN'
 
@@ -245,7 +245,7 @@ def finish(update, context, db, token):
     return 'START'
 
 
-def delivery_notification(context):
+def get_delivery_notification(context):
     message = dedent(f'''
     Приятного аппетита! *место для рекламы*\n
     *сообщение что делать если пицца не пришла*
