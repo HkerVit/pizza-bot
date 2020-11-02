@@ -1,1 +1,1 @@
-bot: python3 pizza_bot.py
+bot: python3 tg_pizza_bot.py
