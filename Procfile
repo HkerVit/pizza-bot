@@ -1,1 +1,1 @@
-web: gunicorn facebook-pizza-bot:app --log-file=-
+web: gunicorn app:app --log-file=-
