@@ -1,1 +1,1 @@
-bot: python3 tg_pizza_bot.py
+web: gunicorn app:app --log-file=-
