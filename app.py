@@ -41,11 +41,11 @@ def webhook():
                     sender_id = messaging_event["sender"]["id"]        # the facebook ID of the person sending you the message
                     recipient_id = messaging_event["recipient"]["id"]  # the recipient's ID, which should be your page's facebook ID
                     message_text = messaging_event["message"]["text"]  # the message's text
-                    send_keyboard(sender_id, message_text)
+                    send_menu(sender_id, message_text)
     return "ok", 200
 
 
-def send_keyboard(recipient_id, message_text):
+def send_menu(recipient_id, message_text):
     elements = get_menu_keyboard_content()
     params = {"access_token": os.environ["PAGE_ACCESS_TOKEN"]}
     headers = {"Content-Type": "application/json"}
@@ -58,6 +58,7 @@ def send_keyboard(recipient_id, message_text):
                     "type": "template",
                     "payload": {
                         "template_type": "generic",
+                        "image_aspect_ratio": "square",
                         "elements": elements
                     }
                 }
@@ -78,8 +79,10 @@ def get_menu_keyboard_content():
     for product in products:
         title = f'{product["name"]} ({product["price"]}р.)'
         description = product['description']
+        image_url = moltin.get_image_url(moltin_token, product['image_id'])
         elements.append({
                     "title": title,
+                    "image_url": image_url,
                     "subtitle": description,
                     "buttons": [
                         {
@@ -89,10 +92,8 @@ def get_menu_keyboard_content():
                         },
                     ]
                 })
-                
+
     return elements
-
-
 
 
 if __name__ == '__main__':
