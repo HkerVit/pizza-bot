@@ -6,7 +6,13 @@ from datetime import datetime
 import requests
 from flask import Flask, request
 
+import moltin
+from moltin_token import get_token
+
 app = Flask(__name__)
+_database = None
+moltin_token = None
+moltin_token_time = 0
 
 
 @app.route('/', methods=['GET'])
@@ -31,16 +37,16 @@ def webhook():
     if data["object"] == "page":
         for entry in data["entry"]:
             for messaging_event in entry["messaging"]:
-                if messaging_event.get("message"):
-                    print(messaging_event)  # someone sent us a message
+                if messaging_event.get("message"):  # someone sent us a message
                     sender_id = messaging_event["sender"]["id"]        # the facebook ID of the person sending you the message
                     recipient_id = messaging_event["recipient"]["id"]  # the recipient's ID, which should be your page's facebook ID
                     message_text = messaging_event["message"]["text"]  # the message's text
-                    send_message(sender_id, message_text)
+                    send_keyboard(sender_id, message_text)
     return "ok", 200
 
 
 def send_keyboard(recipient_id, message_text):
+    elements = get_menu_keyboard_content()
     params = {"access_token": os.environ["PAGE_ACCESS_TOKEN"]}
     headers = {"Content-Type": "application/json"}
     request_content = json.dumps({
@@ -52,19 +58,7 @@ def send_keyboard(recipient_id, message_text):
                     "type": "template",
                     "payload": {
                         "template_type": "generic",
-                        "elements": [
-                            {
-                                "title": "Пицца!",
-                                "subtitle": "Тут будет про пиццу.",
-                                "buttons": [
-                                    {
-                                        "type": "postback",
-                                        "title": "Хочу пиццу",
-                                        "payload": "pizza_bot",
-                                    },
-                                ]
-                            }
-                        ]
+                        "elements": elements
                     }
                 }
             }
@@ -72,6 +66,34 @@ def send_keyboard(recipient_id, message_text):
     url = 'https://graph.facebook.com/v2.6/me/messages'
     response = requests.post(url, params=params, headers=headers, data=request_content)
     response.raise_for_status()
+    
+
+def get_menu_keyboard_content():
+    global moltin_token
+    global moltin_token_time
+    moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
+
+    elements = []
+    products = moltin.get_products_list(moltin_token)[0:5]
+    for product in products:
+        title = f'{product["name"]} ({product["price"]}р.)'
+        description = product['description']
+        elements.append({
+                    "title": title,
+                    "subtitle": description,
+                    "buttons": [
+                        {
+                            "type": "postback",
+                            "title": "Купить пиццу",
+                            "payload": "pizza_bot",
+                        },
+                    ]
+                })
+                
+    return elements
+
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
