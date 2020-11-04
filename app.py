@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 import requests
-from flask import Flask, request
+from flask import Flask, request, send_file
 
 import moltin
 from moltin_token import get_token
@@ -45,6 +45,16 @@ def webhook():
     return "ok", 200
 
 
+@app.route('/get_image', methods=['GET'])
+def get_logo():
+    if request.args.get('type') == '1':
+       filename = 'img/pizza_logo.png'
+    else:
+       return "Bad request", 400
+
+    return send_file(filename, mimetype='image/gif')
+
+
 def send_menu(recipient_id, message_text):
     elements = get_menu_keyboard_content()
     params = {"access_token": os.environ["PAGE_ACCESS_TOKEN"]}
@@ -74,8 +84,29 @@ def get_menu_keyboard_content():
     global moltin_token_time
     moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
 
-    elements = []
-    products = moltin.get_products_list(moltin_token)[0:5]
+    elements = [{
+                    "title": "Меню",
+                    "image_url": "https://8f2c1832d211.ngrok.io/get_image?type=1",
+                    "subtitle": "Здесь вы можете выбрать один из вариантов",
+                    "buttons": [
+                        {
+                            "type": "postback",
+                            "title": "Корзина",
+                            "payload": "cart",
+                        },
+                        {
+                            "type": "postback",
+                            "title": "Акции",
+                            "payload": "event",
+                        },
+                        {
+                            "type": "postback",
+                            "title": "Сделать заказ",
+                            "payload": "order",
+                        },
+                    ]
+                }]
+    products = moltin.get_products_list(moltin_token)[0:4]
     for product in products:
         title = f'{product["name"]} ({product["price"]}р.)'
         description = product['description']
@@ -87,8 +118,8 @@ def get_menu_keyboard_content():
                     "buttons": [
                         {
                             "type": "postback",
-                            "title": "Купить пиццу",
-                            "payload": "pizza_bot",
+                            "title": "Добавить в корзину",
+                            "payload": "add_to_cart",
                         },
                     ]
                 })
