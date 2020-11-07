@@ -24,12 +24,14 @@ def verify():
         if not request.args.get("hub.verify_token") == os.environ["VERIFY_TOKEN"]:
             return "Verification token mismatch", 403
         return request.args["hub.challenge"], 200
-
     return "Hello world", 200
 
 
 @app.route('/', methods=['POST'])
 def webhook():
+    global moltin_token
+    global moltin_token_time
+    moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
     """
     Основной вебхук, на который будут приходить сообщения от Facebook.
     """
@@ -37,25 +39,31 @@ def webhook():
     if data["object"] == "page":
         for entry in data["entry"]:
             for messaging_event in entry["messaging"]:
-                if messaging_event.get("message"):  # someone sent us a message
-                    sender_id = messaging_event["sender"]["id"]        # the facebook ID of the person sending you the message
-                    recipient_id = messaging_event["recipient"]["id"]  # the recipient's ID, which should be your page's facebook ID
-                    message_text = messaging_event["message"]["text"]  # the message's text
-                    send_menu(sender_id, message_text)
+                if messaging_event.get("message"):
+                    sender_id = messaging_event["sender"]["id"]
+                    # recipient_id = messaging_event["recipient"]["id"]
+                    # message_text = messaging_event["message"]["text"]
+                    send_menu(sender_id)
+                elif messaging_event.get("postback"):
+                    print('1')
+                else:
+                    print('2')
     return "ok", 200
 
 
 @app.route('/get_image', methods=['GET'])
-def get_logo():
+def get_image():
     if request.args.get('type') == '1':
-       filename = 'img/pizza_logo.png'
+        filename = 'img/pizza_logo.png'
+    elif request.args.get('type') == '2':
+        filename = 'img/pizza_category.jpg'
     else:
-       return "Bad request", 400
+        return "Bad request", 400
 
     return send_file(filename, mimetype='image/gif')
 
 
-def send_menu(recipient_id, message_text):
+def send_menu(recipient_id):
     elements = get_menu_keyboard_content()
     params = {"access_token": os.environ["PAGE_ACCESS_TOKEN"]}
     headers = {"Content-Type": "application/json"}
@@ -80,51 +88,85 @@ def send_menu(recipient_id, message_text):
     
 
 def get_menu_keyboard_content():
-    global moltin_token
-    global moltin_token_time
-    moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
+    categories = moltin.get_all_categories(moltin_token)
+    first_page_menu = get_first_page_menu()
 
-    elements = [{
-                    "title": "Меню",
-                    "image_url": "https://8f2c1832d211.ngrok.io/get_image?type=1",
-                    "subtitle": "Здесь вы можете выбрать один из вариантов",
-                    "buttons": [
-                        {
-                            "type": "postback",
-                            "title": "Корзина",
-                            "payload": "cart",
-                        },
-                        {
-                            "type": "postback",
-                            "title": "Акции",
-                            "payload": "event",
-                        },
-                        {
-                            "type": "postback",
-                            "title": "Сделать заказ",
-                            "payload": "order",
-                        },
-                    ]
-                }]
-    products = moltin.get_products_list(moltin_token)[0:4]
-    for product in products:
+    front_page_category_id = categories['Главная']
+    main_pizza_menu = get_main_pizza_menu(front_page_category_id)
+
+    categories_pizza_menu = get_categories_pizza_menu(categories)
+
+    return first_page_menu + main_pizza_menu + categories_pizza_menu
+
+
+def get_first_page_menu():
+    return [{
+                "title": "Меню",
+                "image_url": "https://75e710fa02b8.ngrok.io/get_image?type=1",
+                "subtitle": "Здесь вы можете выбрать один из вариантов",
+                "buttons": [
+                    {
+                        "type": "postback",
+                        "title": "Корзина",
+                        "payload": "cart",
+                    },
+                    {
+                        "type": "postback",
+                        "title": "Акции",
+                        "payload": "event",
+                    },
+                    {
+                        "type": "postback",
+                        "title": "Сделать заказ",
+                        "payload": "order",
+                    },
+                ]
+            }]
+
+
+def get_main_pizza_menu(front_page_id):
+    front_page_products = moltin.get_products_by_category_id(moltin_token, front_page_id)
+    menu = []
+    for product in front_page_products:
         title = f'{product["name"]} ({product["price"]}р.)'
         description = product['description']
         image_url = moltin.get_image_url(moltin_token, product['image_id'])
-        elements.append({
-                    "title": title,
-                    "image_url": image_url,
-                    "subtitle": description,
-                    "buttons": [
+        menu.append({
+            "title": title,
+            "image_url": image_url,
+            "subtitle": description,
+            "buttons": [{
+                    "type": "postback",
+                    "title": "Добавить в корзину",
+                    "payload": "add_to_cart",
+                }]
+            })
+    return menu
+
+
+def get_categories_pizza_menu(categories):
+    return[{
+                "title": "Не нашли нужную пиццу?",
+                "image_url": "https://75e710fa02b8.ngrok.io/get_image?type=2",
+                "subtitle": "Вы можете выбрать пиццу из следующих категорий:",
+                "buttons": [
                         {
                             "type": "postback",
-                            "title": "Добавить в корзину",
-                            "payload": "add_to_cart",
+                            "title": "Особые",
+                            "payload": "special",
+                        },
+                        {
+                            "type": "postback",
+                            "title": "Сытные",
+                            "payload": "fat",
+                        },
+                        {
+                            "type": "postback",
+                            "title": "Острые",
+                            "payload": "spicy",
                         },
                     ]
-                })
-
-    return elements
+            }]
 
 
 if __name__ == '__main__':
