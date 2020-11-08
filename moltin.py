@@ -71,7 +71,6 @@ def get_all_categories(token):
     return categories
 
     
-
 def get_product_by_id(token, product_id):
     headers = {
         'Authorization': f'Bearer {token}',
