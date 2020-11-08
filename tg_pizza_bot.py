@@ -12,7 +12,7 @@ from environs import Env
 from moltin_token import get_token
 from fetch_coordinates import fetch_coordinates
 import moltin
-import keyboard
+import tg_keyboard
 import payment
 
 env = Env()
@@ -36,7 +36,7 @@ def start(update, context, db, token):
     
     products = moltin.get_products_list(token)
     db.set('products', json.dumps(products))
-    reply_markup = keyboard.get_menu_keyboard(chat_id, products, menu_button)
+    reply_markup = tg_keyboard.get_menu_keyboard(chat_id, products, menu_button)
 
     if reply_markup is None:
         message = 'Для того, чтобы начать отправьте боту /start'
@@ -57,7 +57,7 @@ def handle_menu(update, context, db, token):
     chat_id = query.message.chat_id
 
     product_id = query.data
-    reply_markup, message, image = keyboard.get_product_reply(db, product_id, token)
+    reply_markup, message, image = tg_keyboard.get_product_reply(db, product_id, token)
 
     context.bot.send_photo(chat_id=chat_id, photo=image,
                            caption=message, reply_markup=reply_markup)
@@ -94,7 +94,7 @@ def handle_cart(update, context, db, token):
                                  product_id=product_id,
                                  chat_id=chat_id)
 
-    reply_markup, message, cart = keyboard.get_cart_reply(moltin_token, chat_id)
+    reply_markup, message, cart = tg_keyboard.get_cart_reply(moltin_token, chat_id)
     db.set(user_cart, json.dumps(cart))
     query.edit_message_text(text=message, reply_markup=reply_markup)
 
@@ -125,7 +125,7 @@ def handle_location(update, context, db, token):
         lat = update.message.location.latitude
         lon = update.message.location.longitude
 
-    reply_markup, message, pizzeria, delivery_fee = keyboard.get_location_reply(token, lon, lat)
+    reply_markup, message, pizzeria, delivery_fee = tg_keyboard.get_location_reply(token, lon, lat)
     update.message.reply_text(message, reply_markup=reply_markup)
 
     cart = json.loads(db.get(user_cart))
@@ -145,7 +145,7 @@ def handle_delivery(update, context, db, token):
     cart = json.loads(db.get(user_cart))
     pizzeria = json.loads(db.get(user_pizzeria))
 
-    reply_markup, customer_message, cart = keyboard.get_delivery_reply(token, query, pizzeria, cart)
+    reply_markup, customer_message, cart = tg_keyboard.get_delivery_reply(token, query, pizzeria, cart)
     query.edit_message_text(customer_message, reply_markup=reply_markup)
     db.set(user_cart, json.dumps(cart))
 
