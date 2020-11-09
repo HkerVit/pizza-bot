@@ -1,17 +1,28 @@
-import os
 import requests
 import json
 
+from environs import Env
+
 import moltin
 
+env = Env()
+env.read_env()
 
-def send_menu(recipient_id, token, message='menu'):
-    elements = get_menu_keyboard_content(token, message)
-    params = {'access_token': os.environ['PAGE_ACCESS_TOKEN']}
+
+def send_menu(sender_id, token, db, message='menu'):
+    user = f'fb_{sender_id}'
+    if db.get('products') is None:
+        products = moltin.get_products_list(token)
+        db.set('products', json.dumps(products))
+    else:
+        products = json.loads(db.get('products'))
+
+    elements = get_menu_keyboard_content(token, message, db, user)
+    params = {'access_token': env('PAGE_ACCESS_TOKEN')}
     headers = {'Content-Type': 'application/json'}
     request_content = json.dumps({
             'recipient': {
-                'id': recipient_id
+                'id': sender_id
             },
             'message': {
                 'attachment': {
@@ -29,15 +40,32 @@ def send_menu(recipient_id, token, message='menu'):
     response.raise_for_status()
     
 
-def get_menu_keyboard_content(token, message):
-    categories = moltin.get_all_categories(token)
+def get_menu_keyboard_content(token, message, db, user):
+    if db.get('categories') is None:
+        categories = moltin.get_all_categories(token)
+        db.set('categories', json.dumps(categories))
+    else:
+        categories = json.loads(db.get('categories'))
+
     first_page_menu = get_first_page_menu()
+
     if message == '/start' or message == 'menu':
         front_page_category_id = categories['Главная']
-        products = moltin.get_products_by_category_id(token, front_page_category_id)
+        user_front_page = f'{user}_front_page'
+        if db.get(user_front_page) is None:
+            products = moltin.get_products_by_category_id(token, front_page_category_id)
+            db.set(user_front_page, json.dumps(products))
+        else:
+            products = json.loads(db.get(user_front_page))
+
     elif 'start' in message:
         __, category_id = message.split(',')
-        products = moltin.get_products_by_category_id(token, category_id)[:5]
+        user_product_category = f'{user}_category'
+        if db.get(user_product_category) is None:
+            products = moltin.get_products_by_category_id(token, category_id)[:5]
+            db.set(user_product_category, json.dumps(products))
+        else:
+            products = json.loads(db.get(user_product_category))
 
     main_pizza_menu = get_main_pizza_menu(products, token, message)
 
@@ -51,7 +79,7 @@ def get_menu_keyboard_content(token, message):
 def get_first_page_menu():
     return [{
                 'title': 'Меню',
-                'image_url': 'https://75e710fa02b8.ngrok.io/get_image?type=1',
+                'image_url': env('MENU_IMAGE'),
                 'subtitle': 'Здесь вы можете выбрать один из вариантов',
                 'buttons': [
                     {
@@ -79,17 +107,17 @@ def get_main_pizza_menu(products, token, message):
         title = f'{product["name"]} ({product["price"]}р.)'
         description = product['description']
         image_url = moltin.get_image_url(token, product['image_id'])
-        if message == 'menu':
+        if message == '/start' or message == 'menu':
             buttons = [{
                     'type': 'postback',
                     'title': 'Добавить в корзину',
-                    'payload': 'add_to_cart',
+                    'payload': f'add_to_cart,{product["id"]}',
                 }]
         else:
             buttons = [{
                     'type': 'postback',
                     'title': 'Добавить в корзину',
-                    'payload': 'add_to_cart',
+                    'payload': f'add_to_cart,{product["id"]}',
                 },
                 {
                 'type': 'postback',
@@ -119,14 +147,9 @@ def get_categories_pizza_menu(categories):
         })
         button_count += 1
         if button_count == 2:
-            buttons.append({
-                'type': 'postback',
-                'title': 'Главное меню',
-                'payload': 'menu',
-            })
             menu.append({
                 'title': 'Не нашли нужную пиццу?',
-                'image_url': 'https://75e710fa02b8.ngrok.io/get_image?type=2',
+                'image_url': env('CATEGORY_IMAGE'),
                 'subtitle': 'Посмотрите пиццу из следующих категорий:',
                 'buttons': buttons,
             })
