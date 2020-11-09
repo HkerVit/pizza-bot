@@ -7,13 +7,13 @@ env = Env()
 env.read_env()
 
 
-def send_help_message(recipient_id, message):
+def send_help_message(sender_id, message):
     params = {'access_token': env('PAGE_ACCESS_TOKEN')}
     headers = {'Content-Type': 'application/json'}
     text = f'Невозможно распознать команду {message}. Для начала нажмите старт'
     request_content = json.dumps({
             'recipient': {
-                'id': recipient_id
+                'id': sender_id
             },
             'message': {
                 'attachment': {
