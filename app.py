@@ -9,7 +9,9 @@ from environs import Env
 
 import fb_menu_keyboard
 import fb_help_message
-import fb_add_to_cart_message
+import fb_cart_keyboard
+from fb_add_to_cart_message import send_add_to_cart_message
+from fb_remove_from_cart_message import send_remove_from_cart_message
 from moltin_token import get_token
 
 app = Flask(__name__)
@@ -33,9 +35,21 @@ def handle_help(sender_id, message):
 
 def handle_menu(sender_id, message, db):
     if 'add_to_cart' in message:
-        fb_add_to_cart_message.send_add_to_cart_message(sender_id, message, moltin_token, db)
-
+        send_add_to_cart_message(sender_id, message, moltin_token, db)
+    if message == 'cart':
+        fb_cart_keyboard.get_cart_keyboard(sender_id, moltin_token)
     return 'MENU'
+
+
+def handle_cart(sender_id, message, db):
+    if 'add_to_cart' in message:
+        send_add_to_cart_message(sender_id, message, moltin_token, db)
+    if 'remove_from_cart' in message:
+        send_remove_from_cart_message(sender_id, message, moltin_token, db)
+
+    fb_cart_keyboard.get_cart_keyboard(sender_id, moltin_token)
+
+    return 'CART'
 
 
 def handle_users_reply(sender_id, message_text):
@@ -48,6 +62,7 @@ def handle_users_reply(sender_id, message_text):
         'START': handle_start,
         'HELP': handle_help,
         'MENU': handle_menu,
+        'CART': handle_cart,
     }
 
     user = f'fb_{sender_id}'
@@ -59,6 +74,8 @@ def handle_users_reply(sender_id, message_text):
             user_state = 'START'
         elif 'start' in message_text:
             user_state = 'START'
+        elif message_text == 'cart':
+            user_state = 'CART'
         else:
             user_state = recorded_state.decode('utf-8')
     
