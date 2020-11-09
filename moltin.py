@@ -148,10 +148,12 @@ def get_cart_items(token, chat_id):
         items.append({
             'name': item['name'],
             'id': item['id'],
+            'product_id': item['product_id'],
             'description': item['description'],
             'price': item['meta']['display_price']['with_tax']['unit']['formatted'],
             'quantity': item['quantity'],
             'amount': item['meta']['display_price']['with_tax']['value']['formatted'],
+            'image_url': item['image']['href']
         })
 
     total_amount = cart['meta']['display_price']['with_tax']['amount']
@@ -159,11 +161,11 @@ def get_cart_items(token, chat_id):
     return {'items': items, 'total_amount': total_amount}
 
 
-def remove_cart_item(token, chat_id, product_id):
+def remove_cart_item(token, chat_id, item_id):
     headers = {
         'Authorization': f'Bearer {token}',
     }
-    url = f'https://api.moltin.com/v2/carts/{chat_id}/items/{product_id}'
+    url = f'https://api.moltin.com/v2/carts/{chat_id}/items/{item_id}'
 
     response = requests.delete(url, headers=headers)
     response.raise_for_status()
