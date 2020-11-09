@@ -9,8 +9,8 @@ env = Env()
 env.read_env()
 
 
-def send_add_to_cart_message(recipient_id, message, token, db):
-    user = f'fb_{recipient_id}'
+def send_add_to_cart_message(sender_id, message, token, db):
+    user = f'fb_{sender_id}'
     __, product_id = message.split(',')
     quantity = 1
     moltin.add_product_to_cart(product_id, token, quantity, user)
@@ -21,7 +21,7 @@ def send_add_to_cart_message(recipient_id, message, token, db):
     text = f'Пицца {product["name"]} добавлена в корзину'
     request_content = json.dumps({
         "recipient": {
-            "id": recipient_id
+            "id": sender_id
         },
         "message": {
             "text": text
