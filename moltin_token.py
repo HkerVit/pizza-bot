@@ -9,7 +9,7 @@ client_id = env('MOLTIN_CLIENT_ID')
 client_secret = env('MOLTIN_CLIENT_SECRET_TOKEN')
 
 
-def get_token(token, token_time):
+def get_token(token=None, token_time=0):
     current_time = time.time()
 
     if token and current_time <= token_time:
