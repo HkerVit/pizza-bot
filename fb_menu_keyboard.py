@@ -4,6 +4,7 @@ import json
 from environs import Env
 
 import moltin
+from check_moltin_menu import get_products_by_categories
 
 env = Env()
 env.read_env()
@@ -11,11 +12,6 @@ env.read_env()
 
 def send_menu(sender_id, token, db, message='menu'):
     user = f'fb_{sender_id}'
-    if db.get('products') is None:
-        products = moltin.get_products_list(token)
-        db.set('products', json.dumps(products))
-    else:
-        products = json.loads(db.get('products'))
 
     elements = get_menu_keyboard_content(token, message, db, user)
     params = {'access_token': env('PAGE_ACCESS_TOKEN')}
@@ -41,31 +37,24 @@ def send_menu(sender_id, token, db, message='menu'):
     
 
 def get_menu_keyboard_content(token, message, db, user):
-    if db.get('categories') is None:
+    categories = json.loads(db.get('categories'))
+    if categories is None:
         categories = moltin.get_all_categories(token)
         db.set('categories', json.dumps(categories))
-    else:
-        categories = json.loads(db.get('categories'))
+    
+    products_by_categories = json.loads(db.get('products_by_categories'))
+    if products_by_categories is None:
+        products_by_categories = get_products_by_categories(token, db, categories)
+        db.set('product_by_categories', json.dumps(products_by_categories))
 
     first_page_menu = get_first_page_menu()
 
     if message == '/start' or message == 'menu':
-        front_page_category_id = categories['Главная']
-        user_front_page = f'{user}_front_page'
-        if db.get(user_front_page) is None:
-            products = moltin.get_products_by_category_id(token, front_page_category_id)
-            db.set(user_front_page, json.dumps(products))
-        else:
-            products = json.loads(db.get(user_front_page))
+        products = products_by_categories['Главная']
 
     elif 'start' in message:
-        __, category_id = message.split(',')
-        user_product_category = f'{user}_category'
-        if db.get(user_product_category) is None:
-            products = moltin.get_products_by_category_id(token, category_id)[:5]
-            db.set(user_product_category, json.dumps(products))
-        else:
-            products = json.loads(db.get(user_product_category))
+        __, category = message.split(',')
+        products = products_by_categories[category][:4]
 
     main_pizza_menu = get_main_pizza_menu(products, token, message)
 
@@ -136,10 +125,10 @@ def get_main_pizza_menu(products, token, message):
 def get_categories_pizza_menu(categories):
     button_count = 0
     buttons, menu = [], []
-    for category, category_id in categories.items():
+    for category in categories:
         if category == 'Главная':
             continue
-        payload = f'start,{category_id}'
+        payload = f'start,{category}'
         buttons.append({
             'type': 'postback',
             'title': category,
