@@ -10,17 +10,17 @@ env.read_env()
 
 
 def send_add_to_cart_message(sender_id, message, token, db):
-    menu = json.loads(db.get('menu'))
-
+    menu = db.get('menu')
     if menu is None:
         menu = moltin.get_products_list(token)
         db.set('menu', json.dumps(menu))
+    else:
+        menu = json.loads(db.get('menu'))
 
     user = f'fb_{sender_id}'
     __, product_id = message.split(',')
     quantity = 1
     moltin.add_product_to_cart(product_id, token, quantity, user)
-    menu = json.loads(db.get('menu'))
     product = next((product for product in menu if product['id'] == product_id))
     params = {'access_token': env('PAGE_ACCESS_TOKEN')}
     headers = {'Content-Type': 'application/json'}

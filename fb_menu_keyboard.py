@@ -37,15 +37,19 @@ def send_menu(sender_id, token, db, message='menu'):
     
 
 def get_menu_keyboard_content(token, message, db, user):
-    categories = json.loads(db.get('categories'))
+    categories = db.get('categories')
     if categories is None:
         categories = moltin.get_all_categories(token)
         db.set('categories', json.dumps(categories))
+    else:
+        categories = json.loads(db.get('categories'))
     
-    products_by_categories = json.loads(db.get('products_by_categories'))
+    products_by_categories = db.get('products_by_categories')
     if products_by_categories is None:
         products_by_categories = get_products_by_categories(token, db, categories)
         db.set('product_by_categories', json.dumps(products_by_categories))
+    else:
+        products_by_categories = json.loads(db.get('products_by_categories'))
 
     first_page_menu = get_first_page_menu()
 
@@ -56,11 +60,11 @@ def get_menu_keyboard_content(token, message, db, user):
         __, category = message.split(',')
         products = products_by_categories[category][:4]
 
-    main_pizza_menu = get_main_pizza_menu(products, token, message)
+    main_pizza_menu = get_main_pizzas_menu(products, token, message)
 
     if message == '/start' or message == 'menu':
-        categories_pizza_menu = get_categories_pizza_menu(categories)
-        return first_page_menu + main_pizza_menu + categories_pizza_menu
+        pizzas_categories_menu = get_pizzas_categories_menu(categories)
+        return first_page_menu + main_pizza_menu + pizzas_categories_menu
     
     return first_page_menu + main_pizza_menu
 
@@ -90,7 +94,7 @@ def get_first_page_menu():
             }]
 
 
-def get_main_pizza_menu(products, token, message):
+def get_main_pizzas_menu(products, token, message):
     menu = []
     for product in products:
         title = f'{product["name"]} ({product["price"]}р.)'
@@ -122,7 +126,7 @@ def get_main_pizza_menu(products, token, message):
     return menu
 
 
-def get_categories_pizza_menu(categories):
+def get_pizzas_categories_menu(categories):
     button_count = 0
     buttons, menu = [], []
     for category in categories:
