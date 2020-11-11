@@ -92,6 +92,7 @@ Python scripts files:
 |fb_cart_keyboard.py|Provide the cart keyboard|
 |moltin.py|Interaction with moltin online-shop by APY request|
 |moltin_token.py|Get the moltin access token and expiration time|
+|check_moltin_menu.py|Script check the moltin menu changes and write it to database|
 ---
 
 ## License
