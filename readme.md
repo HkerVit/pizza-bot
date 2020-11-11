@@ -40,11 +40,11 @@ Declare default environment variables in `.env` file:
 
 `VERIFY_TOKEN` - token, that facebook send for verification.
 
-`MENU_IMAGE` - link of first page image.
+`MENU_IMAGE` - link of first page image from flask website.
 
-`CATEGORY_IMAGE` - link of category page image.
+`CATEGORY_IMAGE` - link of category page image from flask website.
 
-`CART_IMAGE` - link of cart page image.
+`CART_IMAGE` - link of cart page image from flask website.
 
 ## How To Use
 
