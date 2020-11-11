@@ -76,6 +76,8 @@ Local addresses is highlighted red line, but facebook app accept only `https pro
 
 Usage example:
 
+This bot was deployed on [Heroku cloud platform](https://heroku.com). For online usage please go to facebook page [Devman education](https://www.facebook.com/Devman-education-116578710248118/), then go to messages and send `/start`.
+
 ![screenshot](screenshot/fb_pizza_bot.gif)
 
 ## Description of files
