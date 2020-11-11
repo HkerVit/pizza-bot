@@ -45,7 +45,7 @@ def handle_cart(sender_id, message, db):
     if 'add_to_cart' in message:
         send_add_to_cart_message(sender_id, message, moltin_token, db)
     if 'remove_from_cart' in message:
-        send_remove_from_cart_message(sender_id, message, moltin_token, db)
+        send_remove_from_cart_message(sender_id, message, moltin_token)
 
     fb_cart_keyboard.get_cart_keyboard(sender_id, moltin_token)
 
