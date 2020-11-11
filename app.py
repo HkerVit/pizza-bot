@@ -1,5 +1,3 @@
-import os
-import requests
 import logging
 import json
 
@@ -16,24 +14,22 @@ from moltin_token import get_token
 
 app = Flask(__name__)
 _database = None
-moltin_token = None
-moltin_token_time = 0
 
 env = Env()
 env.read_env()
 
 
-def handle_start(sender_id, message, db):
+def handle_start(sender_id, message, db, moltin_token):
     fb_menu_keyboard.send_menu(sender_id, moltin_token, db, message)
     return 'MENU'
 
 
-def handle_help(sender_id, message):
+def get_help(sender_id, message, moltin_token):
     fb_help_message.send_help_message(sender_id, message)
     return 'START'
 
 
-def handle_menu(sender_id, message, db):
+def handle_menu(sender_id, message, db, moltin_token):
     if 'add_to_cart' in message:
         send_add_to_cart_message(sender_id, message, moltin_token, db)
     if message == 'cart':
@@ -41,26 +37,23 @@ def handle_menu(sender_id, message, db):
     return 'MENU'
 
 
-def handle_cart(sender_id, message, db):
+def handle_cart(sender_id, message, db, moltin_token):
     if 'add_to_cart' in message:
         send_add_to_cart_message(sender_id, message, moltin_token, db)
     if 'remove_from_cart' in message:
         send_remove_from_cart_message(sender_id, message, moltin_token)
 
     fb_cart_keyboard.get_cart_keyboard(sender_id, moltin_token)
-
     return 'CART'
 
 
 def handle_users_reply(sender_id, message_text):
-    global moltin_token
-    global moltin_token_time
-    moltin_token, moltin_token_time = get_token(moltin_token, moltin_token_time)
     db = get_database_connection()
+    moltin_token = get_token(db)
 
     states_functions = {
         'START': handle_start,
-        'HELP': handle_help,
+        'HELP': get_help,
         'MENU': handle_menu,
         'CART': handle_cart,
     }
@@ -84,7 +77,7 @@ def handle_users_reply(sender_id, message_text):
         
     state_handler = states_functions[user_state]
     try:
-        next_state = state_handler(sender_id, message_text, db)
+        next_state = state_handler(sender_id, message_text, db, moltin_token)
         db.set(user, next_state)
     except Exception as err:
         logging.exception(err)
