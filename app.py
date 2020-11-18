@@ -1,7 +1,7 @@
 import logging
-import os
+import json
 
-from flask import Flask, request, send_file, send_from_directory, url_for
+from flask import Flask, request, send_from_directory
 import redis
 from environs import Env
 
@@ -11,6 +11,7 @@ import fb_cart_keyboard
 from fb_add_to_cart_message import send_add_to_cart_message
 from fb_remove_from_cart_message import send_remove_from_cart_message
 from moltin_token import get_token
+import moltin
 
 app = Flask(__name__, static_url_path='/static')
 _database = None
@@ -30,18 +31,41 @@ def get_help(sender_id, message, moltin_token):
 
 
 def handle_menu(sender_id, message, db, moltin_token):
+    user = f'fb_{sender_id}'
+
     if 'add_to_cart' in message:
-        send_add_to_cart_message(sender_id, message, moltin_token, db)
+        menu = db.get('menu')
+        if not menu:
+            menu = moltin.get_products_list(moltin_token)
+            db.set('menu', json.dumps(menu))
+        else:
+            menu = json.loads(db.get('menu'))
+        __, product_id = message.split(',')
+
+        send_add_to_cart_message(sender_id, product_id, moltin_token, user, menu)
+
     if message == 'cart':
         fb_cart_keyboard.get_cart_keyboard(sender_id, moltin_token)
     return 'MENU'
 
 
 def handle_cart(sender_id, message, db, moltin_token):
+    user = f'fb_{sender_id}'
+
     if 'add_to_cart' in message:
-        send_add_to_cart_message(sender_id, message, moltin_token, db)
+        menu = db.get('menu')
+        if not menu:
+            menu = moltin.get_products_list(moltin_token)
+            db.set('menu', json.dumps(menu))
+        else:
+            menu = json.loads(db.get('menu'))
+        __, product_id = message.split(',')
+
+        send_add_to_cart_message(sender_id, product_id, moltin_token, user, menu)
+
     if 'remove_from_cart' in message:
-        send_remove_from_cart_message(sender_id, message, moltin_token)
+        __, item_id = message.split(',')
+        send_remove_from_cart_message(sender_id, message, moltin_token, user, item_id)
 
     fb_cart_keyboard.get_cart_keyboard(sender_id, moltin_token)
     return 'CART'
@@ -109,7 +133,7 @@ def webhook():
                     payload = messaging_event['postback']['payload']
                     handle_users_reply(sender_id, payload)
     return "ok", 200
-    
+
 
 @app.route('/img/')
 def send_img(path):
