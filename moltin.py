@@ -14,9 +14,6 @@ def get_products_list(token):
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     products_response = response.json()
-    # with open('json/test.json', 'w', encoding='utf-8') as file:
-    #     json.dump(products_response, file, ensure_ascii=False)
-    
     products = []
     for product in products_response['data']:
         products.append({
