@@ -16,14 +16,14 @@ def send_remove_from_cart_message(sender_id, message, token):
     params = {'access_token': env('PAGE_ACCESS_TOKEN')}
     headers = {'Content-Type': 'application/json'}
     text = f'Убрана из корзины'
-    request_content = json.dumps({
+    request_content = {
         "recipient": {
             "id": sender_id
         },
         "message": {
             "text": text
         }
-    })
+    }
     url = 'https://graph.facebook.com/v2.6/me/messages'
-    response = requests.post(url, params=params, headers=headers, data=request_content)
+    response = requests.post(url, params=params, headers=headers, json=request_content)
     response.raise_for_status()

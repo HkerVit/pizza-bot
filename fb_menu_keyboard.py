@@ -16,7 +16,7 @@ def send_menu(sender_id, token, db, message='menu'):
     elements = get_menu_keyboard_content(token, message, db, user)
     params = {'access_token': env('PAGE_ACCESS_TOKEN')}
     headers = {'Content-Type': 'application/json'}
-    request_content = json.dumps({
+    request_content = {
             'recipient': {
                 'id': sender_id
             },
@@ -30,9 +30,9 @@ def send_menu(sender_id, token, db, message='menu'):
                     }
                 }
             }
-        })
+        }
     url = 'https://graph.facebook.com/v2.6/me/messages'
-    response = requests.post(url, params=params, headers=headers, data=request_content)
+    response = requests.post(url, params=params, headers=headers, json=request_content)
     response.raise_for_status()
     
 
