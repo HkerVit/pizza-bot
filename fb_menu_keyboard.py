@@ -38,14 +38,14 @@ def send_menu(sender_id, token, db, message='menu'):
 
 def get_menu_keyboard_content(token, message, db, user):
     categories = db.get('categories')
-    if categories is None:
+    if not categories:
         categories = moltin.get_all_categories(token)
         db.set('categories', json.dumps(categories))
     else:
         categories = json.loads(db.get('categories'))
     
     products_by_categories = db.get('products_by_categories')
-    if products_by_categories is None:
+    if not products_by_categories:
         products_by_categories = get_products_by_categories(token, db, categories)
         db.set('product_by_categories', json.dumps(products_by_categories))
     else:

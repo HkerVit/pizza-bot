@@ -11,7 +11,7 @@ env.read_env()
 
 def send_add_to_cart_message(sender_id, message, token, db):
     menu = db.get('menu')
-    if menu is None:
+    if not menu:
         menu = moltin.get_products_list(token)
         db.set('menu', json.dumps(menu))
     else:
