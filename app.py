@@ -1,7 +1,7 @@
 import logging
-import json
+import os
 
-from flask import Flask, request, send_file
+from flask import Flask, request, send_file, send_from_directory, url_for
 import redis
 from environs import Env
 
@@ -12,7 +12,7 @@ from fb_add_to_cart_message import send_add_to_cart_message
 from fb_remove_from_cart_message import send_remove_from_cart_message
 from moltin_token import get_token
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='/static')
 _database = None
 
 env = Env()
@@ -89,7 +89,9 @@ def verify():
         if not request.args.get('hub.verify_token') == env('VERIFY_TOKEN'):
             return 'Verification token mismatch', 403
         return request.args['hub.challenge'], 200
-    return 'Hello world', 200
+    
+    url = 'qqq'
+    return url, 200
 
 
 @app.route('/', methods=['POST'])
@@ -107,20 +109,11 @@ def webhook():
                     payload = messaging_event['postback']['payload']
                     handle_users_reply(sender_id, payload)
     return "ok", 200
+    
 
-
-@app.route('/get_image', methods=['GET'])
-def get_image():
-    if request.args.get('type') == '1':
-        filename = 'img/pizza_logo.png'
-    elif request.args.get('type') == '2':
-        filename = 'img/pizza_category.jpg'
-    elif request.args.get('type') == '3':
-        filename = 'img/cart.jpg'
-    else:
-        return "Bad request", 400
-
-    return send_file(filename, mimetype='image/gif')
+@app.route('/img/')
+def send_img(path):
+    return send_from_directory('img', path)
 
 
 def get_database_connection():
