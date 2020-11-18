@@ -1,4 +1,3 @@
-import json
 import requests
 
 from environs import Env
@@ -9,9 +8,7 @@ env = Env()
 env.read_env()
 
 
-def send_remove_from_cart_message(sender_id, message, token):
-    user = f'fb_{sender_id}'
-    __, item_id = message.split(',')
+def send_remove_from_cart_message(sender_id, message, token, user, item_id):
     moltin.remove_cart_item(token, user, item_id)
     params = {'access_token': env('PAGE_ACCESS_TOKEN')}
     headers = {'Content-Type': 'application/json'}
