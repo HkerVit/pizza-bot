@@ -17,7 +17,6 @@ app = Flask(__name__, static_url_path='/static')
 _database = None
 
 env = Env()
-env.read_env()
 
 
 def handle_start(sender_id, message, db, moltin_token):
@@ -154,4 +153,5 @@ def get_database_connection():
 
 
 if __name__ == '__main__':
+    env.read_env()
     app.run(debug=True)
