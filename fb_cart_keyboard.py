@@ -6,7 +6,6 @@ from environs import Env
 import moltin
 
 env = Env()
-env.read_env()
 
 
 def get_cart_keyboard(sender_id, token):

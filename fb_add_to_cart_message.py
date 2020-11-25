@@ -5,7 +5,6 @@ from environs import Env
 import moltin
 
 env = Env()
-env.read_env()
 
 
 def send_add_to_cart_message(sender_id, product_id, token, user, menu):

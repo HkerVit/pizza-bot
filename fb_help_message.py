@@ -1,10 +1,8 @@
-import json
 import requests
 
 from environs import Env
 
 env = Env()
-env.read_env()
 
 
 def send_help_message(sender_id, message):

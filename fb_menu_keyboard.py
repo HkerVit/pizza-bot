@@ -7,7 +7,6 @@ import moltin
 from check_moltin_menu import get_products_by_categories
 
 env = Env()
-env.read_env()
 
 
 def send_menu(sender_id, token, db, message='menu'):

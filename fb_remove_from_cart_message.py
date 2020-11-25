@@ -5,7 +5,6 @@ from environs import Env
 import moltin
 
 env = Env()
-env.read_env()
 
 
 def send_remove_from_cart_message(sender_id, message, token, user, item_id):
