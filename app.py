@@ -95,7 +95,7 @@ def handle_users_reply(sender_id, message_text):
         else:
             user_state = recorded_state.decode('utf-8')
     
-    if user_state is None:
+    if not user_state:
         user_state == 'HELP'
         
     state_handler = states_functions[user_state]
@@ -113,8 +113,7 @@ def verify():
             return 'Verification token mismatch', 403
         return request.args['hub.challenge'], 200
     
-    url = 'qqq'
-    return url, 200
+    return 'Hello world', 200
 
 
 @app.route('/', methods=['POST'])
