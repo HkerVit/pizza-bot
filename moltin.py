@@ -14,7 +14,6 @@ def get_products_list(token):
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     products_response = response.json()
-    
     products = []
     for product in products_response['data']:
         products.append({
@@ -22,12 +21,53 @@ def get_products_list(token):
                 'id': product['id'],
                 'description': product['description'],
                 'price': product['meta']['display_price']['with_tax']['formatted'],
-                'image_id': product['relationships']['main_image']['data']['id']
+                'image_id': product['relationships']['main_image']['data']['id'],
             })
 
     return products
 
 
+def get_products_by_category_id(token, category_id):
+    headers = {
+        'Authorization': f'Bearer {token}',
+    }
+
+    params = (
+        ('filter', f'eq(category.id,{category_id})'),
+    )
+    url = 'https://api.moltin.com/v2/products'
+    response = requests.get(url, headers=headers, params=params)
+    response.raise_for_status()
+
+    products_response = response.json()
+    products = []
+    for product in products_response['data']:
+        products.append({
+                'name': product['name'],
+                'id': product['id'],
+                'description': product['description'],
+                'price': product['meta']['display_price']['with_tax']['formatted'],
+                'image_id': product['relationships']['main_image']['data']['id'],
+            })
+
+    return products
+
+
+def get_all_categories(token):
+    headers = {
+        'Authorization': f'Bearer {token}',
+    }
+
+    response = requests.get('https://api.moltin.com/v2/categories', headers=headers)
+    response.raise_for_status()
+    categories_response = response.json()['data']
+    categories = {}
+    for category in categories_response:
+        categories[category['name']] = category['id']
+    
+    return categories
+
+    
 def get_product_by_id(token, product_id):
     headers = {
         'Authorization': f'Bearer {token}',
@@ -105,10 +145,12 @@ def get_cart_items(token, chat_id):
         items.append({
             'name': item['name'],
             'id': item['id'],
+            'product_id': item['product_id'],
             'description': item['description'],
             'price': item['meta']['display_price']['with_tax']['unit']['formatted'],
             'quantity': item['quantity'],
             'amount': item['meta']['display_price']['with_tax']['value']['formatted'],
+            'image_url': item['image']['href']
         })
 
     total_amount = cart['meta']['display_price']['with_tax']['amount']
@@ -116,11 +158,11 @@ def get_cart_items(token, chat_id):
     return {'items': items, 'total_amount': total_amount}
 
 
-def remove_cart_item(token, chat_id, product_id):
+def remove_cart_item(token, chat_id, item_id):
     headers = {
         'Authorization': f'Bearer {token}',
     }
-    url = f'https://api.moltin.com/v2/carts/{chat_id}/items/{product_id}'
+    url = f'https://api.moltin.com/v2/carts/{chat_id}/items/{item_id}'
 
     response = requests.delete(url, headers=headers)
     response.raise_for_status()
