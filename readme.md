@@ -187,7 +187,3 @@ Python scripts files:
 ### License
 
 You can copy, distribute and modify the software.
-
-### Motivation
-
-This project was created as part of online course for web developer [dvmn.org](https://dvmn.org/modules/).
